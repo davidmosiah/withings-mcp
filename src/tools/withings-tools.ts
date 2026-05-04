@@ -145,12 +145,12 @@ export function registerWithingsTools(server: McpServer): void {
     }
   });
 
-  registerCollectionTool(server, "withings_list_body_measures", "Withings Body Measures", "/measure", "getmeas", "List Withings punctual measurements such as weight and body composition. Requires user.metrics scope.");
+  registerCollectionTool(server, "withings_list_body_measures", "Withings Body Measures", "/measure", "getmeas", "List Withings punctual measurements such as weight and body composition. Requires user.metrics scope. Not medical advice.");
   registerCollectionTool(server, "withings_list_activity", "Withings Daily Activity", "/v2/measure", "getactivity", "List Withings daily activity summaries. Requires user.activity scope.");
   registerCollectionTool(server, "withings_list_workouts", "Withings Workouts", "/v2/measure", "getworkouts", "List Withings workouts. Requires user.activity scope.");
-  registerCollectionTool(server, "withings_list_sleep_summary", "Withings Sleep Summaries", "/v2/sleep", "getsummary", "List Withings sleep summaries with common sleep fields. Requires user.activity scope.", { data_fields: SLEEP_SUMMARY_FIELDS });
-  registerCollectionTool(server, "withings_list_sleep", "Withings Sleep Detail", "/v2/sleep", "get", "List detailed Withings sleep data where available. Requires user.activity scope.");
-  registerCollectionTool(server, "withings_list_heart", "Withings Heart Records", "/v2/heart", "list", "List Withings heart records where available. Requires user.metrics scope.");
+  registerCollectionTool(server, "withings_list_sleep_summary", "Withings Sleep Summaries", "/v2/sleep", "getsummary", "List Withings sleep summaries with common sleep fields. Requires user.activity scope. Not medical advice.", { data_fields: SLEEP_SUMMARY_FIELDS });
+  registerCollectionTool(server, "withings_list_sleep", "Withings Sleep Detail", "/v2/sleep", "get", "List detailed Withings sleep data where available. Requires user.activity scope. Not medical advice.");
+  registerCollectionTool(server, "withings_list_heart", "Withings Heart Records", "/v2/heart", "list", "List Withings heart records where available. Requires user.metrics scope. Not medical advice.");
 
   server.registerTool("withings_connection_status", {
     title: "Withings Connection Status",
