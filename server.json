@@ -1,0 +1,71 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.davidmosiah/withingsmcp",
+  "description": "Privacy-first, unofficial Withings MCP server for AI health, sleep, activity and heart-rate agents.",
+  "repository": {
+    "url": "https://github.com/davidmosiah/withingsmcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "withings-mcp-unofficial",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "WITHINGS_CLIENT_ID",
+          "description": "Withings OAuth client ID. Optional when configured with withings-mcp-server setup.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "WITHINGS_CLIENT_SECRET",
+          "description": "Withings OAuth client secret. Prefer withings-mcp-server setup so this secret is stored in ~/.withings-mcp/config.json instead of MCP client config.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "WITHINGS_REDIRECT_URI",
+          "description": "Redirect URI configured in the Withings Developer Dashboard. Optional when configured with withings-mcp-server setup.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "WITHINGS_TOKEN_PATH",
+          "description": "Optional local path for OAuth tokens. Defaults to ~/.withings-mcp/tokens.json.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "WITHINGS_PRIVACY_MODE",
+          "description": "Optional payload mode: summary, structured, or raw. Defaults to structured. raw means full Withings API payloads, not continuous 24/7 raw sensor telemetry.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "WITHINGS_CACHE",
+          "description": "Optional SQLite cache toggle. Set to true or sqlite to enable.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "WITHINGS_CACHE_PATH",
+          "description": "Optional local SQLite cache path. Defaults to ~/.withings-mcp/cache.sqlite.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

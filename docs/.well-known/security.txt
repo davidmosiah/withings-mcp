@@ -1,0 +1,4 @@
+Contact: https://github.com/davidmosiah/withingsmcp/issues
+Preferred-Languages: en, pt-BR
+Canonical: https://withingsmcp.vercel.app/.well-known/security.txt
+Policy: https://github.com/davidmosiah/withingsmcp/blob/main/SECURITY.md

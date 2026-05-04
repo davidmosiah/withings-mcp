@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Withings MCP Unofficial — Health Signals for AI Agents</title>
+  <meta name="description" content="Unofficial local-first Withings MCP server for AI agents. Connect activity, sleep, body-measure, heart and workout context through the official Withings Public API.">
+  <meta name="keywords" content="Withings MCP, Withings API, Model Context Protocol, AI agents, Claude, Cursor, Hermes, OpenClaw, sleep, weight, heart rate, health data">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://withingsmcp.vercel.app/">
+  <meta property="og:title" content="Withings MCP Unofficial">
+  <meta property="og:description" content="Your Withings signal, safely available to your AI agent. Local-first OAuth, 16 tools, daily and weekly health summaries.">
+  <meta property="og:image" content="https://withingsmcp.vercel.app/assets/og-card.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="assets/favicon.svg">
+  <link rel="stylesheet" href="assets/site.css">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Withings MCP Unofficial","codeRepository":"https://github.com/davidmosiah/withingsmcp","url":"https://withingsmcp.vercel.app/","programmingLanguage":"TypeScript","runtimePlatform":"Node.js","license":"https://github.com/davidmosiah/withingsmcp/blob/main/LICENSE","applicationCategory":"DeveloperApplication","description":"Unofficial local-first MCP server that connects AI agents to user-authorized Withings Public API data."}
+  </script>
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div><div class="grid-noise"></div>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Withings MCP home"><span class="brand-glyph"><i></i><i></i><i></i><i></i><i></i></span><span><strong>Withings MCP</strong><small>unofficial local bridge</small></span></a>
+    <nav class="nav" aria-label="Primary navigation"><a href="#install">Install</a><a href="#signals">Signals</a><a href="#agents">Agents</a><a href="#privacy">Privacy</a><a class="nav-cta" href="https://github.com/davidmosiah/withingsmcp">GitHub</a></nav>
+  </header>
+  <main id="top">
+    <section class="hero section-shell">
+      <div class="hero-copy">
+        <p class="eyebrow">Read-only OAuth · local tokens · agent-native health context</p>
+        <h1>Your body already sends signals. Your agent should know how to listen.</h1>
+        <p class="hero-text">Withings MCP is an unofficial, open-source bridge that gives AI agents safe access to your Withings activity, sleep, body-measure, heart and workout context through the official Withings Public API.</p>
+        <div class="hero-actions"><a class="button primary" href="#install">Install in 3 minutes</a><a class="button ghost" href="https://github.com/davidmosiah/withingsmcp">View source</a><a class="button ghost" href="https://www.npmjs.com/package/withings-mcp-unofficial">npm</a></div>
+        <div class="command-pill"><code>npx -y withings-mcp-unofficial setup</code><button type="button" data-copy="npx -y withings-mcp-unofficial setup&#10;npx -y withings-mcp-unofficial auth&#10;npx -y withings-mcp-unofficial doctor">Copy</button></div>
+      </div>
+      <div class="signal-stage" aria-label="Withings signal dashboard preview">
+        <div class="stage-ring ring-one"></div><div class="stage-ring ring-two"></div><div class="core-orb"><span>16</span><small>tools</small></div>
+        <svg class="ecg" viewBox="0 0 560 150" role="img" aria-label="Animated heart signal line"><path d="M8 84 H72 L91 84 L110 36 L136 118 L162 84 H238 L266 84 L286 58 L306 102 L328 84 H410 L432 84 L452 24 L484 126 L506 84 H552"/></svg>
+        <article class="metric-card card-sleep"><small>Sleep</small><strong>7h 10m</strong><span>stage-ready context</span></article>
+        <article class="metric-card card-hrv"><small>Weight</small><strong>80 kg</strong><span>trend, not diagnosis</span></article>
+        <article class="metric-card card-load"><small>Activity</small><strong>9,000</strong><span>steps + active minutes</span></article>
+      </div>
+    </section>
+    <section class="proof-strip" aria-label="Project facts"><article><strong>Official API</strong><span>Withings Public API OAuth2</span></article><article><strong>Local-first</strong><span>tokens under ~/.withings-mcp</span></article><article><strong>16 tools</strong><span>activity, sleep, body measures, heart</span></article><article><strong>Agent-ready</strong><span>Claude, Cursor, Hermes, OpenClaw</span></article></section>
+    <section id="install" class="section-shell install-section"><div class="section-head"><p class="eyebrow">For humans</p><h2>No API archaeology. No token pasted into agent configs.</h2><p>Withings developer setup is the hard part. This page gives the exact callback, scopes and commands so a non-technical user can delegate the install safely.</p></div><div class="install-grid"><article class="install-card"><span>01</span><h3>Create your Withings app</h3><p>Open the Withings developer console and add this callback URL.</p><div class="copy-row"><code>http://127.0.0.1:3000/callback</code><button data-copy="http://127.0.0.1:3000/callback">Copy</button></div><a href="https://account.withings.com/partner/dashboard_oauth2">Open Withings apps</a></article><article class="install-card featured"><span>02</span><h3>Grant read scopes</h3><p>The MCP is read-only by default. It needs the scopes below for health and training summaries.</p><div class="copy-row"><code>user.activity user.metrics</code><button data-copy="user.activity user.metrics">Copy</button></div></article><article class="install-card terminal-card"><span>03</span><h3>Run setup</h3><pre><code>npx -y withings-mcp-unofficial setup
+npx -y withings-mcp-unofficial auth
+npx -y withings-mcp-unofficial doctor</code></pre><button data-copy="npx -y withings-mcp-unofficial setup&#10;npx -y withings-mcp-unofficial auth&#10;npx -y withings-mcp-unofficial doctor">Copy commands</button></article></div></section>
+    <section id="signals" class="section-shell signals-section"><div class="section-head narrow"><p class="eyebrow">The toolbelt</p><h2>Processed health signals, shaped for agents.</h2></div><div class="tool-grid"><article><b>Activity</b><span>daily activity, steps, calories and distance when available</span></article><article><b>Sleep</b><span>summaries, duration, efficiency and stages when Withings provides them</span></article><article><b>Body measures</b><span>weight and body-composition groups where granted</span></article><article><b>Heart</b><span>heart records when account, devices and scopes permit</span></article><article><b>Workouts</b><span>workout summaries when granted</span></article></div></section>
+    <section id="agents" class="section-shell agent-section"><div class="agent-panel"><div><p class="eyebrow">For agents</p><h2>A manifest that tells agents how not to break things.</h2><p>Agents should call <code>withings_agent_manifest</code> and <code>withings_connection_status</code> first. Hermes gets direct tool names and explicit reload guidance so it does not restart the gateway for normal Withings access.</p></div><div class="agent-prompt"><button data-copy="Install the unofficial Withings MCP server for me. Repository: https://github.com/davidmosiah/withingsmcp. Create a Withings app with callback http://127.0.0.1:3000/callback and read scopes user.activity user.metrics. Run npx -y withings-mcp-unofficial setup, auth and doctor. If this is Hermes, use setup --client hermes and reload MCP with /reload-mcp or hermes mcp test withings. Do not print tokens or secrets. Do not provide medical diagnosis.">Copy delegation prompt</button><pre><code>Install the unofficial Withings MCP server for me.
+Repo: github.com/davidmosiah/withingsmcp
+Scopes: user.activity user.metrics
+Then run setup, auth and doctor.
+Keep tokens local. No medical diagnosis.</code></pre></div></div></section>
+    <section id="privacy" class="section-shell privacy-section"><div class="section-head narrow"><p class="eyebrow">Trust boundary</p><h2>Health data is not a toy payload.</h2><p>This MCP exposes processed Withings Public API data. It does not expose raw accelerometer telemetry, private Google endpoints, or clinical diagnosis. Raw JSON is explicit; summary and structured modes are safer defaults.</p></div><div class="privacy-grid"><article><strong>summary</strong><span>minimal safe fields</span></article><article><strong>structured</strong><span>normalized agent data</span></article><article><strong>raw</strong><span>explicit upstream JSON</span></article><article><strong>0600</strong><span>local token permissions</span></article></div></section>
+    <section class="closing section-shell"><div><p class="eyebrow">Open source quantified-self infrastructure</p><h2>Make personal health agents safer, clearer and more useful.</h2></div><div class="hero-actions"><a class="button primary" href="https://github.com/davidmosiah/withingsmcp">Star on GitHub</a><a class="button ghost" href="quickstart.md">Read quickstart</a></div></section>
+  </main>
+  <footer class="footer">Unofficial project. Not affiliated with Withings. Not medical advice.</footer>
+  <script src="assets/site.js"></script>
+</body>
+</html>

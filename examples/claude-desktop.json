@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "withings": {
+      "command": "npx",
+      "args": ["-y", "withings-mcp-unofficial"]
+    }
+  }
+}
