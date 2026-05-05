@@ -75,7 +75,7 @@
   "bugs": {
     "url": "https://github.com/davidmosiah/withingsmcp/issues"
   },
-  "homepage": "https://withingsmcp.vercel.app/",
+  "homepage": "https://wellness.delx.ai/connectors/withings",
   "mcpName": "io.github.davidmosiah/withingsmcp",
   "publishConfig": {
     "access": "public",

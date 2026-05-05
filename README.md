@@ -191,7 +191,8 @@ npx @modelcontextprotocol/inspector node dist/index.js
 ## Links
 
 - npm: <https://www.npmjs.com/package/withings-mcp-unofficial>
-- Docs site: <https://withingsmcp.vercel.app/>
+- Docs site: <https://wellness.delx.ai/connectors/withings>
+- Legacy docs: <https://withingsmcp.vercel.app/>
 - GitHub: <https://github.com/davidmosiah/withingsmcp>
 - Delx Wellness registry: <https://github.com/davidmosiah/delx-wellness>
 - Connector quality standard: <https://github.com/davidmosiah/delx-wellness/blob/main/docs/connector-quality-standard.md>
