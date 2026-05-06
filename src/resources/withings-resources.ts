@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import { buildAgentManifest, formatAgentManifestMarkdown } from "../services/agent-manifest.js";
 import { buildCapabilities } from "../services/capabilities.js";
+import { buildDataInventory } from "../services/inventory.js";
 import { getConfig } from "../services/config.js";
 import { applyPrivacy, resolvePrivacyMode } from "../services/privacy.js";
 import { buildDailySummary, buildWeeklySummary, formatSummaryMarkdown } from "../services/summary.js";
@@ -38,6 +39,7 @@ async function weeklySummaryResource(uri: URL) {
 }
 
 export function registerWithingsResources(server: McpServer): void {
+  server.registerResource("withings_data_inventory", "withings://inventory", { title: "Withings Data Inventory", description: "Static inventory of supported Withings data domains, privacy modes and recommended first calls.", mimeType: "application/json" }, async (uri) => textResource(uri, JSON.stringify(buildDataInventory(), null, 2), "application/json"));
   server.registerResource("withings_capabilities", "withings://capabilities", { title: "Withings MCP Capabilities", description: "Static capabilities, API boundary, privacy modes and recommended agent workflow.", mimeType: "application/json" }, async (uri) => textResource(uri, JSON.stringify(buildCapabilities(), null, 2), "application/json"));
   server.registerResource("withings_agent_manifest", "withings://agent-manifest", { title: "Withings Agent Manifest", description: "Machine-readable install and operating instructions for AI agents.", mimeType: "text/markdown" }, async (uri) => textResource(uri, formatAgentManifestMarkdown(buildAgentManifest("generic"))));
   server.registerResource("withings_latest_activity", "withings://latest/activity", { title: "Latest Withings Activity", description: "Most recent Withings activity record in the configured privacy mode.", mimeType: "application/json" }, latestActivityResource);

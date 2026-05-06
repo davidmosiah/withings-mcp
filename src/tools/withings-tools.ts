@@ -11,11 +11,12 @@ import {
   ConnectionStatusInputSchema,
   ConnectionStatusOutputSchema,
   DailySummaryInputSchema,
+  DataInventoryOutputSchema,
   ExchangeCodeInputSchema,
   ExchangeCodeOutputSchema,
   PrivacyAuditOutputSchema,
-  RevokeAccessOutputSchema,
   ResponseOnlyInputSchema,
+  RevokeAccessOutputSchema,
   SummaryOutputSchema,
   WeeklySummaryInputSchema,
   WellnessContextInputSchema,
@@ -24,6 +25,7 @@ import {
 import { buildAgentManifest, formatAgentManifestMarkdown } from "../services/agent-manifest.js";
 import { buildPrivacyAudit } from "../services/audit.js";
 import { buildCapabilities } from "../services/capabilities.js";
+import { buildDataInventory, formatInventoryMarkdown } from "../services/inventory.js";
 import { buildConnectionStatus } from "../services/connection-status.js";
 import { getConfig } from "../services/config.js";
 import { bulletList, formatCollection, makeError, makeResponse } from "../services/format.js";
@@ -87,6 +89,21 @@ function registerCollectionTool(server: McpServer, name: string, title: string, 
 }
 
 export function registerWithingsTools(server: McpServer): void {
+  server.registerTool("withings_data_inventory", {
+    title: "Withings Data Inventory",
+    description: "Inventory supported Withings data domains, auth scope requirements, privacy boundary and recommended first calls. Does not call Withings APIs or expose user data.",
+    inputSchema: ResponseOnlyInputSchema.shape,
+    outputSchema: DataInventoryOutputSchema.shape,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    }
+  }, async ({ response_format }) => {
+    const inventory = buildDataInventory();
+    return makeResponse(inventory, response_format, formatInventoryMarkdown(inventory));
+  });
   server.registerTool("withings_agent_manifest", {
     title: "Withings Agent Manifest",
     description: "Machine-readable install, runtime and client guidance for AI agents. Does not call Withings or expose secrets.",

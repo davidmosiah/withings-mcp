@@ -97,6 +97,7 @@ This package uses the official Withings Public API. When this README says `raw`,
 **Start with these:**
 
 - `withings_connection_status` — verify local setup before calling Withings
+- `withings_data_inventory` — inventory supported data domains, scopes, privacy modes and recommended first calls without calling Withings APIs.
 - `withings_daily_summary` — body, sleep, activity and heart brief for today
 - `withings_weekly_summary` — scorecard, comparison vs prior week, next-week plan
 

@@ -4,14 +4,16 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const expectedTools = [
   'withings_agent_manifest', 'withings_cache_status', 'withings_capabilities', 'withings_connection_status',
-  'withings_daily_summary', 'withings_exchange_code', 'withings_get_auth_url',
-  'withings_list_activity', 'withings_list_body_measures', 'withings_list_heart',
-  'withings_list_sleep', 'withings_list_sleep_summary', 'withings_list_workouts',
-  'withings_privacy_audit', 'withings_revoke_access', 'withings_weekly_summary',
-  'withings_wellness_context'
+  'withings_daily_summary', 'withings_data_inventory', 'withings_exchange_code', 'withings_get_auth_url',
+  'withings_list_activity', 'withings_list_body_measures', 'withings_list_heart', 'withings_list_sleep',
+  'withings_list_sleep_summary', 'withings_list_workouts', 'withings_privacy_audit', 'withings_revoke_access',
+  'withings_weekly_summary', 'withings_wellness_context'
 ];
 
-const expectedResources = ['withings://agent-manifest', 'withings://capabilities', 'withings://latest/activity', 'withings://latest/sleep', 'withings://summary/daily', 'withings://summary/weekly'];
+const expectedResources = [
+  'withings://agent-manifest', 'withings://capabilities', 'withings://inventory', 'withings://latest/activity',
+  'withings://latest/sleep', 'withings://summary/daily', 'withings://summary/weekly'
+];
 const expectedPrompts = ['withings_body_sleep_investigation', 'withings_daily_checkin', 'withings_weekly_review'];
 
 const client = new Client({ name: 'withings-mcp-smoke-test', version: '0.0.0' });
@@ -42,6 +44,10 @@ try {
   assert.ok(capabilitiesResult.structuredContent?.api_boundary?.does_not_include?.includes('Advanced Research API raw accelerometer or PPG streams'));
   assert.ok(capabilitiesResult.structuredContent?.supported_data?.some((entry) => entry.tools?.includes('withings_list_sleep_summary')));
   assert.ok(capabilitiesResult.structuredContent?.recommended_agent_flow?.some((step) => step.includes('withings_connection_status')));
+
+  const inventoryResult = await client.callTool({ name: 'withings_data_inventory', arguments: { response_format: 'json' } });
+  assert.equal(inventoryResult.structuredContent?.kind, 'data_inventory');
+  assert.equal(typeof inventoryResult.structuredContent?.source, 'string');
 
   const manifestResult = await client.callTool({ name: 'withings_agent_manifest', arguments: { client: 'hermes', response_format: 'json' } });
   assert.equal(manifestResult.structuredContent?.client, 'hermes');

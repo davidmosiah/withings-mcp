@@ -4,37 +4,25 @@ export const AGENT_CLIENTS = ["generic", "claude", "cursor", "windsurf", "hermes
 export type AgentClientName = typeof AGENT_CLIENTS[number];
 
 export const HERMES_DIRECT_TOOLS = [
-  "mcp_withings_withings_agent_manifest",
-  "mcp_withings_withings_connection_status",
-  "mcp_withings_withings_daily_summary",
-  "mcp_withings_withings_weekly_summary",
-  "mcp_withings_withings_wellness_context",
-  "mcp_withings_withings_list_activity",
-  "mcp_withings_withings_list_sleep_summary",
-  "mcp_withings_withings_list_body_measures"
+  "mcp_withings_withings_agent_manifest", "mcp_withings_withings_connection_status", "mcp_withings_withings_daily_summary",
+  "mcp_withings_withings_data_inventory", "mcp_withings_withings_list_activity", "mcp_withings_withings_list_body_measures",
+  "mcp_withings_withings_list_sleep_summary", "mcp_withings_withings_weekly_summary", "mcp_withings_withings_wellness_context"
 ];
 
 const STANDARD_TOOLS = [
-  "withings_agent_manifest",
-  "withings_capabilities",
-  "withings_connection_status",
-  "withings_get_auth_url",
-  "withings_exchange_code",
-  "withings_list_body_measures",
-  "withings_list_activity",
-  "withings_list_workouts",
-  "withings_list_sleep_summary",
-  "withings_list_sleep",
-  "withings_list_heart",
-  "withings_daily_summary",
-  "withings_weekly_summary",
-  "withings_wellness_context",
-  "withings_privacy_audit",
-  "withings_cache_status",
-  "withings_revoke_access"
+  "withings_agent_manifest", "withings_cache_status", "withings_capabilities",
+  "withings_connection_status", "withings_daily_summary", "withings_data_inventory",
+  "withings_exchange_code", "withings_get_auth_url", "withings_list_activity",
+  "withings_list_body_measures", "withings_list_heart", "withings_list_sleep",
+  "withings_list_sleep_summary", "withings_list_workouts", "withings_privacy_audit",
+  "withings_revoke_access", "withings_weekly_summary", "withings_wellness_context"
 ];
 
-const RESOURCES = ["withings://agent-manifest", "withings://capabilities", "withings://latest/activity", "withings://latest/sleep", "withings://summary/daily", "withings://summary/weekly"];
+const RESOURCES = [
+  "withings://agent-manifest", "withings://capabilities", "withings://inventory",
+  "withings://latest/activity", "withings://latest/sleep", "withings://summary/daily",
+  "withings://summary/weekly"
+];
 
 export function parseAgentClientName(value: string): AgentClientName {
   return AGENT_CLIENTS.includes(value as AgentClientName) ? value as AgentClientName : "generic";
@@ -60,7 +48,7 @@ export function buildAgentManifest(client: AgentClientName = "generic") {
       token_storage: "~/.withings-mcp/tokens.json with 0600 permissions",
       secret_storage: "~/.withings-mcp/config.json or WITHINGS_* environment variables; never print secrets"
     },
-    recommended_first_calls: ["withings_connection_status", "withings_wellness_context", "withings_daily_summary", "withings_weekly_summary"],
+    recommended_first_calls: ["withings_connection_status", "withings_data_inventory", "withings_wellness_context", "withings_daily_summary", "withings_weekly_summary"],
     standard_tools: STANDARD_TOOLS,
     resources: RESOURCES,
     hermes: {
@@ -76,7 +64,7 @@ export function buildAgentManifest(client: AgentClientName = "generic") {
       doctor_command: "npx -y withings-mcp-unofficial doctor --client hermes --json"
     },
     agent_rules: [
-      "Call withings_connection_status before Withings data tools.",
+      "Call withings_connection_status and withings_data_inventory before Withings data tools.",
       "If setup is incomplete, guide the user through setup, auth and doctor instead of guessing token state.",
       "Treat Withings health data as sensitive. Do not expose raw payloads unless the user asks for raw mode.",
       "Body, sleep, heart and workout fields depend on the user's Withings devices, API plan, scopes and consent; explain missing data clearly.",
