@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 - 2026-05-11
+
+- Add `withings_quickstart` tool — personalized 3-step setup walkthrough adapted to current state (env vars set? OAuth token present? what's next?). Returns cross-connector hints to pair with wellness-nourish, wellness-cycle-coach, and wellness-cgm-mcp.
+- Add `withings_demo` tool — realistic example payloads of `withings_daily_summary`, `withings_wellness_context`, and `withings_list_body_measures` with weight 72.5kg, body fat 18.5%, BP 118/76, sleep 7h28m so agents see the contract before any real Withings API call.
+- `recommended_first_calls` on the agent manifest now leads with `withings_quickstart` and `withings_demo`.
+- Tool count: 18 → 20.
+
 ## 0.1.1
 
 - Updated `zod` to `4.4.3` after the initial public repository dependency check.

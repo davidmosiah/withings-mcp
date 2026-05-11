@@ -132,6 +132,123 @@ export function registerWithingsTools(server: McpServer): void {
     }));
   });
 
+  server.registerTool(
+    "withings_quickstart",
+    {
+      title: "Withings Quickstart",
+      description:
+        "Personalized 3-step setup walkthrough for the human user. Adapts to current state (env vars set? token present? what's next?). Call this first when the user asks 'how do I connect Withings?'",
+      inputSchema: ResponseOnlyInputSchema.shape,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ response_format }) => {
+      const status = await buildConnectionStatus();
+      const hasEnv = status.missing_env.length === 0;
+      const hasToken = status.ready_for_withings_api;
+      const steps = [
+        {
+          step: 1,
+          title: hasEnv ? "(done) Withings developer credentials configured" : "Sign up at https://account.withings.com/partner/dashboard_oauth2",
+          action: hasEnv
+            ? "WITHINGS_CLIENT_ID, WITHINGS_CLIENT_SECRET, WITHINGS_REDIRECT_URI are all set."
+            : `Create a Withings developer app, register a redirect URI (use ${status.redirect_uri ?? "http://127.0.0.1:3000/callback"}), then set: ${status.missing_env.join(", ")}.`,
+          done: hasEnv,
+        },
+        {
+          step: 2,
+          title: hasToken ? "(done) Local token present — ready to read Withings data" : "Run the OAuth dance",
+          action: hasToken
+            ? "Tokens stored under ~/.withings-mcp/tokens.json. The connector will refresh automatically when needed."
+            : "Run `withings-mcp-server auth` (or call withings_get_auth_url + withings_exchange_code from the agent). Open the URL, grant access, paste the code within Withings' short authorization-code window.",
+          done: hasToken,
+        },
+        {
+          step: 3,
+          title: "Verify with the agent",
+          action: "Call withings_connection_status, then withings_daily_summary or withings_wellness_context. Pair with wellness-nourish for weight-aware meal coaching.",
+          example: hasToken
+            ? "withings_wellness_context() → sleep + body composition + activity handoff for nourish/cycle-coach."
+            : "Until step 2 is done, the data tools will surface a clear 'auth required' message.",
+          done: false,
+        },
+      ];
+      const payload = {
+        ok: true,
+        ready: hasEnv && hasToken,
+        steps,
+        next: steps.find((s) => !s.done) ?? steps[steps.length - 1],
+        cross_connector_hints: [
+          "Pair Withings body composition with wellness-nourish for weight-trend-aware meal coaching.",
+          "Pair Withings sleep + HR with wellness-cycle-coach for late-luteal load adjustments.",
+          "Pair Withings BP + sleep with wellness-cgm-mcp glucose for metabolic-stress signals.",
+        ],
+      };
+      const markdown = bulletList("Withings Quickstart", {
+        ready: payload.ready,
+        next: payload.next.title,
+      });
+      return makeResponse(payload, response_format, markdown);
+    }
+  );
+
+  server.registerTool(
+    "withings_demo",
+    {
+      title: "Withings Demo",
+      description:
+        "Returns realistic example payloads of withings_daily_summary, withings_wellness_context, and withings_list_body_measures so agents see the contract before calling real Withings APIs.",
+      inputSchema: ResponseOnlyInputSchema.shape,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ response_format }) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const payload = {
+        ok: true,
+        is_demo: true,
+        sample: {
+          withings_daily_summary: {
+            date: today,
+            body: { weight_kg: 72.5, body_fat_pct: 18.5, muscle_mass_kg: 56.1, water_pct: 58.4, bone_mass_kg: 3.2 },
+            blood_pressure: { systolic_mmhg: 118, diastolic_mmhg: 76, heart_rate_bpm: 62 },
+            sleep: { sleep_score: 78, total_sleep_min: 448, sleep_efficiency: 0.91, deep_min: 84, rem_min: 96, light_min: 268, hr_average_bpm: 56, hr_min_bpm: 50 },
+            activity: { steps: 8_421, active_calories: 489, distance_m: 6_870, moderate_min: 41, intense_min: 12 },
+          },
+          withings_wellness_context: {
+            window: "last_24h",
+            sleep_score: 78,
+            sleep_duration_min: 448,
+            weight_kg: 72.5,
+            body_fat_pct: 18.5,
+            blood_pressure: "118/76",
+            resting_hr_bpm: 56,
+            recommendation: "Solid sleep duration (7h28m) and stable weight trend — good baseline for moderate training today. Hydrate before noon; resting HR is slightly elevated.",
+          },
+          withings_list_body_measures: {
+            count: 3,
+            records: [
+              { date: today, weight_kg: 72.5, body_fat_pct: 18.5, muscle_mass_kg: 56.1 },
+              { date: yesterdayISO(), weight_kg: 72.7, body_fat_pct: 18.7, muscle_mass_kg: 55.9 },
+              { date: dayBeforeISO(), weight_kg: 72.9, body_fat_pct: 18.9, muscle_mass_kg: 55.8 },
+            ],
+          },
+        },
+        notes: [
+          "All sample data is synthetic; tagged with is_demo=true.",
+          "Real calls return live data from the Withings Public API after OAuth setup.",
+        ],
+      };
+      const markdown = bulletList("Withings Demo", {
+        is_demo: true,
+        weight_kg: 72.5,
+        body_fat_pct: 18.5,
+        blood_pressure: "118/76",
+        sleep_duration: "7h28m",
+        recommendation: payload.sample.withings_wellness_context.recommendation,
+      });
+      return makeResponse(payload, response_format, markdown);
+    }
+  );
+
   server.registerTool("withings_get_auth_url", {
     title: "Get Withings OAuth URL",
     description: "Generate a Withings OAuth authorization URL. Use this first when no local token exists.",
@@ -278,4 +395,12 @@ export function registerWithingsTools(server: McpServer): void {
       return makeError((error as Error).message);
     }
   });
+}
+
+function yesterdayISO(): string {
+  return new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+}
+
+function dayBeforeISO(): string {
+  return new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
 }

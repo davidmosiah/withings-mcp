@@ -12,10 +12,11 @@ export const HERMES_DIRECT_TOOLS = [
 const STANDARD_TOOLS = [
   "withings_agent_manifest", "withings_cache_status", "withings_capabilities",
   "withings_connection_status", "withings_daily_summary", "withings_data_inventory",
-  "withings_exchange_code", "withings_get_auth_url", "withings_list_activity",
+  "withings_demo", "withings_exchange_code", "withings_get_auth_url", "withings_list_activity",
   "withings_list_body_measures", "withings_list_heart", "withings_list_sleep",
   "withings_list_sleep_summary", "withings_list_workouts", "withings_privacy_audit",
-  "withings_revoke_access", "withings_weekly_summary", "withings_wellness_context"
+  "withings_quickstart", "withings_revoke_access", "withings_weekly_summary",
+  "withings_wellness_context"
 ];
 
 const RESOURCES = [
@@ -48,7 +49,7 @@ export function buildAgentManifest(client: AgentClientName = "generic") {
       token_storage: "~/.withings-mcp/tokens.json with 0600 permissions",
       secret_storage: "~/.withings-mcp/config.json or WITHINGS_* environment variables; never print secrets"
     },
-    recommended_first_calls: ["withings_connection_status", "withings_data_inventory", "withings_wellness_context", "withings_daily_summary", "withings_weekly_summary"],
+    recommended_first_calls: ["withings_quickstart", "withings_demo", "withings_connection_status", "withings_wellness_context", "withings_daily_summary"],
     standard_tools: STANDARD_TOOLS,
     resources: RESOURCES,
     hermes: {

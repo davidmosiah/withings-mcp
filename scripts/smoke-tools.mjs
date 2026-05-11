@@ -4,10 +4,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const expectedTools = [
   'withings_agent_manifest', 'withings_cache_status', 'withings_capabilities', 'withings_connection_status',
-  'withings_daily_summary', 'withings_data_inventory', 'withings_exchange_code', 'withings_get_auth_url',
-  'withings_list_activity', 'withings_list_body_measures', 'withings_list_heart', 'withings_list_sleep',
-  'withings_list_sleep_summary', 'withings_list_workouts', 'withings_privacy_audit', 'withings_revoke_access',
-  'withings_weekly_summary', 'withings_wellness_context'
+  'withings_daily_summary', 'withings_data_inventory', 'withings_demo', 'withings_exchange_code',
+  'withings_get_auth_url', 'withings_list_activity', 'withings_list_body_measures', 'withings_list_heart',
+  'withings_list_sleep', 'withings_list_sleep_summary', 'withings_list_workouts', 'withings_privacy_audit',
+  'withings_quickstart', 'withings_revoke_access', 'withings_weekly_summary', 'withings_wellness_context'
 ];
 
 const expectedResources = [
