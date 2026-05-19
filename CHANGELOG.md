@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 - 2026-05-19
+
+### Added
+
+- **HTTP retry middleware with exponential backoff + jitter** (`src/services/http-retry.ts`). Every Withings API call (incl. nonce/token requests) now retries on `408`, `429`, `500`, `502`, `503`, `504`, and network errors. Max 3 attempts (initial + 2 retries); backoff schedule `500ms / 1000ms / 2000ms` with ±20% jitter. Honors `Retry-After` (seconds or HTTP-date). Each retry logs to stderr as `[withings-mcp] retry N/3 after Xms (status=Y or error=Z)`. Set `WITHINGS_NO_RETRY=true` to disable (used in tests). No new dependencies.
+
 ## 0.4.1 - 2026-05-11
 
 ### Fixed
