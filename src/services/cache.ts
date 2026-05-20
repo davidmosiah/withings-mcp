@@ -2,11 +2,21 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 
+export interface HttpCacheStatus {
+  size: number;
+  hit_count: number;
+  miss_count: number;
+  hit_rate: number;
+  default_ttl_seconds: number;
+  bypass_env_var: string;
+}
+
 export interface CacheStatus extends Record<string, unknown> {
   enabled: boolean;
   path: string;
   entries: number;
   newest_cached_at?: string;
+  http_cache?: HttpCacheStatus;
 }
 
 export class WithingsCache {

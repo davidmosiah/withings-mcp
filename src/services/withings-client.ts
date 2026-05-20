@@ -3,6 +3,7 @@ import { URL, URLSearchParams } from "node:url";
 import { DEFAULT_LIMIT, MAX_WITHINGS_LIMIT, WITHINGS_API_BASE_URL, WITHINGS_AUTH_URL, WITHINGS_SIGNATURE_PATH, WITHINGS_TOKEN_PATH } from "../constants.js";
 import type { WithingsConfig, WithingsTokenSet } from "../types.js";
 import { disabledCacheStatus, type CacheStatus, WithingsCache } from "./cache.js";
+import { fetchWithCache, getCacheStats } from "./http-cache.js";
 import { fetchWithRetry } from "./http-retry.js";
 import { redactErrorMessage } from "./redaction.js";
 import { TokenStore } from "./token-store.js";
@@ -63,8 +64,17 @@ export class WithingsClient {
   }
 
   cacheStatus(): CacheStatus {
-    if (!this.config.cacheEnabled) return disabledCacheStatus(this.config.cachePath);
-    return this.getCache().status();
+    const httpStats = getCacheStats();
+    const http_cache = {
+      size: httpStats.size,
+      hit_count: httpStats.hit_count,
+      miss_count: httpStats.miss_count,
+      hit_rate: httpStats.hit_rate,
+      default_ttl_seconds: 60,
+      bypass_env_var: "WITHINGS_NO_CACHE"
+    };
+    if (!this.config.cacheEnabled) return { ...disabledCacheStatus(this.config.cachePath), http_cache };
+    return { ...this.getCache().status(), http_cache };
   }
 
   async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number }> {
@@ -269,7 +279,12 @@ export class WithingsClient {
   }
 
   private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-    return fetchWithRetry(url, init);
+    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {});
+    return fetchWithCache(url, init, {
+      defaultTtlSeconds: 60,
+      envVarBypass: "WITHINGS_NO_CACHE",
+      innerFetch: retryWrappedFetch
+    });
   }
 }
 
