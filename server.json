@@ -3,7 +3,7 @@
   "name": "io.github.davidmosiah/withingsmcp",
   "description": "Privacy-first, unofficial Withings MCP server for AI health, sleep, activity and heart-rate agents.",
   "repository": {
-    "url": "https://github.com/davidmosiah/withingsmcp",
+    "url": "https://github.com/davidmosiah/withings-mcp",
     "source": "github"
   },
   "version": "0.4.6",
