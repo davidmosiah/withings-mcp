@@ -86,13 +86,14 @@ export class WithingsClient {
 
     while (pages < maxPages) {
       const payload = await this.get(path, {
-        ...params,
+        ...withingsApiParams(params),
         ...withingsDateRange(params),
         offset,
         limit
       });
       const pageRecords = extractRecords(payload);
-      records.push(...pageRecords);
+      const remaining = limit - records.length;
+      records.push(...pageRecords.slice(0, remaining));
       pages += 1;
       const more = extractMore(payload);
       if (!params.all_pages || !more || pageRecords.length < limit) break;
@@ -286,6 +287,16 @@ export class WithingsClient {
       innerFetch: retryWrappedFetch
     });
   }
+}
+
+const LIST_INTERNAL_KEYS: ReadonlySet<string> = new Set([
+  "after", "before", "page", "limit", "all_pages", "max_pages", "privacy_mode", "response_format"
+]);
+
+function withingsApiParams(params: ListParams & WithingsActionParams): WithingsActionParams {
+  return Object.fromEntries(
+    Object.entries(params).filter(([key]) => !LIST_INTERNAL_KEYS.has(key))
+  ) as WithingsActionParams;
 }
 
 function withingsDateRange(params: ListParams): Record<string, number> {
