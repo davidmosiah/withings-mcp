@@ -100,7 +100,7 @@ export class WithingsClient {
       offset += limit;
     }
 
-    return { records, next_page: records.length && records.length % limit === 0 ? Math.floor(offset / limit) + 1 : undefined, pages_fetched: pages };
+    return { records, next_page: records.length && records.length % limit === 0 ? Math.floor(offset / limit) + 2 : undefined, pages_fetched: pages };
   }
 
   private extractCode(input: string): string {
