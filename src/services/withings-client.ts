@@ -96,7 +96,7 @@ export class WithingsClient {
       records.push(...pageRecords.slice(0, remaining));
       pages += 1;
       const more = extractMore(payload);
-      if (!params.all_pages || !more || pageRecords.length < limit) break;
+      if (!params.all_pages || !more || pageRecords.length < limit || records.length >= limit) break;
       offset += limit;
     }
 
