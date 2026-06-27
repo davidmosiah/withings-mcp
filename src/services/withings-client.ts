@@ -80,26 +80,25 @@ export class WithingsClient {
   async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number }> {
     const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_WITHINGS_LIMIT);
     const maxPages = params.all_pages ? Math.max(1, params.max_pages ?? 1) : 1;
+    const maxRecords = limit * maxPages;
     const records: unknown[] = [];
     let offset = Math.max(((params.page ?? 1) - 1) * limit, 0);
     let pages = 0;
+    let hasMore = false;
 
     while (pages < maxPages) {
-      const payload = await this.get(path, {
-        ...params,
-        ...withingsDateRange(params),
-        offset,
-        limit
-      });
+      const payload = await this.get(path, buildListRequestParams(params, offset, limit));
       const pageRecords = extractRecords(payload);
-      records.push(...pageRecords);
+      const remaining = maxRecords - records.length;
+      records.push(...pageRecords.slice(0, remaining));
       pages += 1;
       const more = extractMore(payload);
-      if (!params.all_pages || !more || pageRecords.length < limit) break;
+      hasMore = more || pageRecords.length > remaining;
+      if (!params.all_pages || !more || pageRecords.length < limit || records.length >= maxRecords) break;
       offset += limit;
     }
 
-    return { records, next_page: records.length && records.length % limit === 0 ? Math.floor(offset / limit) + 1 : undefined, pages_fetched: pages };
+    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, pages_fetched: pages };
   }
 
   private extractCode(input: string): string {
@@ -288,16 +287,46 @@ export class WithingsClient {
   }
 }
 
+const INTERNAL_LIST_PARAM_KEYS = new Set([
+  "after",
+  "before",
+  "page",
+  "limit",
+  "all_pages",
+  "max_pages",
+  "privacy_mode",
+  "response_format"
+]);
+
+function buildListRequestParams(params: ListParams & WithingsActionParams, offset: number, limit: number): WithingsActionParams {
+  return {
+    ...pickUpstreamParams(params),
+    ...withingsDateRange(params),
+    offset,
+    limit
+  };
+}
+
+function pickUpstreamParams(params: WithingsActionParams): WithingsActionParams {
+  return Object.fromEntries(Object.entries(params).filter(([key]) => !INTERNAL_LIST_PARAM_KEYS.has(key))) as WithingsActionParams;
+}
+
 function withingsDateRange(params: ListParams): Record<string, number> {
   const range: Record<string, number> = {};
-  if (params.after) range.startdate = toEpochSeconds(params.after);
-  if (params.before) range.enddate = toEpochSeconds(params.before);
+  if (params.after) range.startdate = toEpochSeconds(params.after, "after");
+  if (params.before) range.enddate = toEpochSeconds(params.before, "before");
+  if (range.startdate !== undefined && range.enddate !== undefined && range.startdate > range.enddate) {
+    throw new Error("Invalid Withings date range: after must be earlier than before.");
+  }
   return range;
 }
 
-function toEpochSeconds(value: string): number {
+function toEpochSeconds(value: string, field: "after" | "before"): number {
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid Withings ${field} filter: use an ISO 8601 date-time with timezone, for example 2026-06-09T00:00:00Z.`);
+  }
+  return Math.floor(parsed / 1000);
 }
 
 function extractRecords(payload: unknown): unknown[] {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.7 - 2026-06-27
+
+### Fixed
+
+- **`withings_list_body_measures` now sends date filters as upstream Withings `startdate` / `enddate` Unix timestamps.** Internal MCP parameters such as `after`, `before`, `page`, `privacy_mode` and `response_format` are no longer forwarded to the Withings API.
+- **`limit` now protects MCP clients even when the upstream endpoint returns more rows than requested.** Collection tools slice the returned records before building the MCP response, preventing large body-measure histories from exceeding client message limits.
+- Invalid `after` / `before` values now fail with a clear ISO 8601 guidance message instead of silently falling back to the current time.
+
 ## 0.4.4 - 2026-05-20
 
 ### Added

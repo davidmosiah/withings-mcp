@@ -4,5 +4,6 @@ Unofficial local-first MCP server for connecting AI agents to user-authorized Wi
 
 Default scopes: user.activity user.metrics.
 Important tools: withings_connection_status, withings_daily_summary, withings_weekly_summary, withings_list_body_measures, withings_list_sleep_summary, withings_list_heart.
+For large body-measure histories, call withings_list_body_measures with ISO 8601 after/before plus a small limit; the server converts the window to Withings startdate/enddate and caps returned records.
 Privacy: tokens stay local under ~/.withings-mcp. summary and structured modes minimize sensitive output. raw mode is explicit.
 Boundary: not affiliated with Withings. Not medical advice. Does not expose raw device telemetry.

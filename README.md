@@ -131,7 +131,7 @@ This package uses the official Withings Public API. When this README says `raw`,
 
 **Body & metrics**
 
-- `withings_list_body_measures` — punctual weight/composition records
+- `withings_list_body_measures` — punctual weight/composition records. Use ISO 8601 `after` / `before` windows for large histories; the server sends Withings `startdate` / `enddate` upstream and caps returned records with `limit`.
 - `withings_list_heart` — heart records when device/plan permit
 
 **Activity**

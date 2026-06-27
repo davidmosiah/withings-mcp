@@ -14,11 +14,11 @@ export const DateTimeSchema = z.string()
   .describe("ISO 8601 date-time with timezone, e.g. 2026-05-01T00:00:00Z");
 
 export const CollectionInputSchema = z.object({
-  after: DateTimeSchema.describe("Only return Withings records after this time. Converted to an Withings start_date."),
-  before: DateTimeSchema.describe("Only return Withings records before this time. Converted to an Withings end_date."),
+  after: DateTimeSchema.describe("Only return Withings records after this time. Converted to Withings startdate."),
+  before: DateTimeSchema.describe("Only return Withings records before this time. Converted to Withings enddate."),
   page: z.number().int().min(1).default(1).describe("Withings page number."),
   limit: z.number().int().min(1).max(MAX_WITHINGS_LIMIT).default(DEFAULT_LIMIT)
-    .describe("Local page-size hint used for pagination safety."),
+    .describe("Upstream page-size hint and local output cap used for pagination safety."),
   all_pages: z.boolean().default(false).describe("Fetch multiple pages up to max_pages."),
   max_pages: z.number().int().min(1).max(MAX_PAGES).default(DEFAULT_MAX_PAGES)
     .describe("Maximum pages to fetch when all_pages is true."),

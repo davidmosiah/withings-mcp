@@ -9,6 +9,7 @@ MCP command: withings-mcp-server
 - MCP registry name: io.github.davidmosiah/withingsmcp
 - Start agents with withings_connection_status and withings_data_inventory before any data tool.
 - Read-only default tools: withings_agent_manifest, withings_capabilities, withings_privacy_audit, withings_connection_status, withings_data_inventory, withings_daily_summary, withings_weekly_summary, withings_cache_status.
+- For large body-measure histories, use withings_list_body_measures with ISO 8601 after/before and a small limit. The server converts the window to Withings startdate/enddate and caps returned records.
 - OAuth env: WITHINGS_CLIENT_ID, WITHINGS_CLIENT_SECRET, WITHINGS_REDIRECT_URI.
 - Optional env: WITHINGS_TOKEN_PATH (token storage path), WITHINGS_PRIVACY_MODE (summary|structured|raw, default structured), WITHINGS_CACHE (true|sqlite to enable), WITHINGS_CACHE_PATH.
 - Prefer JSON responses for automation and markdown responses for human summaries.
