@@ -45,8 +45,8 @@ try {
   const client = new WithingsClient(config);
   const result = await client.list('/measure', {
     action: 'getmeas',
-    after: '2026-06-09T00:00:00Z',
-    before: '2026-06-15T23:59:59Z',
+    after: '2026-06-09T23:00:00-03:00',
+    before: '2026-06-15T23:59:59-03:00',
     page: 1,
     limit: 10,
     all_pages: false,
@@ -58,8 +58,8 @@ try {
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://wbsapi.withings.net/measure');
   assert.equal(calls[0].body.get('action'), 'getmeas');
-  assert.equal(calls[0].body.get('startdate'), '1780963200');
-  assert.equal(calls[0].body.get('enddate'), '1781567999');
+  assert.equal(calls[0].body.get('startdate'), '1781056800');
+  assert.equal(calls[0].body.get('enddate'), '1781578799');
   assert.equal(calls[0].body.get('offset'), '0');
   assert.equal(calls[0].body.get('limit'), '10');
 

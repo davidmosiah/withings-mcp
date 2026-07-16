@@ -42,4 +42,23 @@ assert.equal(context.source, 'withings');
 assert.equal(context.sleep_score, 88);
 assert.equal(context.recent_training_load, 'normal');
 
+let capturedStderr = '';
+const originalStderrWrite = process.stderr.write.bind(process.stderr);
+process.stderr.write = (chunk) => {
+  capturedStderr += String(chunk);
+  return true;
+};
+try {
+  const partialClient = {
+    async get(endpoint, params) {
+      if (endpoint.includes('/v2/sleep')) throw new Error('synthetic Withings sleep failure');
+      return fakeClient.get(endpoint, params);
+    },
+  };
+  await buildDailySummary(partialClient, { days: 7, timezone: 'UTC' });
+} finally {
+  process.stderr.write = originalStderrWrite;
+}
+assert.match(capturedStderr, /\[withings-mcp\] summary domain error: synthetic Withings sleep failure/);
+
 console.log(JSON.stringify({ ok: true, daily: daily.kind, weekly: weekly.kind }, null, 2));

@@ -1,4 +1,5 @@
 import type { WithingsClient } from "./withings-client.js";
+import { redactErrorMessage } from "./redaction.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SLEEP_SUMMARY_FIELDS = "sleep_score,total_sleep_time,total_timeinbed,sleep_efficiency,deepsleepduration,lightsleepduration,remsleepduration,wakeupduration,hr_average,hr_min,hr_max,rr_average";
@@ -73,7 +74,9 @@ async function safeGet(client: Pick<WithingsClient, "get">, endpoint: string, pa
   try {
     return await client.get(endpoint, params);
   } catch (error) {
-    return { error: (error as Error).message, endpoint };
+    const message = redactErrorMessage(error instanceof Error ? error.message : String(error));
+    process.stderr.write(`[withings-mcp] summary domain error: ${message}\n`);
+    return { error: message, endpoint };
   }
 }
 

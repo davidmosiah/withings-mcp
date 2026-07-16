@@ -134,6 +134,7 @@ This package uses the official Withings Public API. When this README says `raw`,
 **Body & metrics**
 
 - `withings_list_body_measures` — punctual weight/composition records. Use ISO 8601 `after` / `before` windows for large histories; the server sends Withings `startdate` / `enddate` upstream and caps returned records with `limit`.
+- Withings filters intentionally preserve the instant represented by an offset ISO date-time when converting it to Unix `startdate` / `enddate` values.
 - `withings_list_heart` — heart records when device/plan permit
 
 **Activity**
@@ -164,6 +165,7 @@ This package uses the official Withings Public API. When this README says `raw`,
 - Withings uses a signed-request OAuth flow — the package handles signing locally; client secrets never reach the MCP client.
 - The server never prints access or refresh tokens.
 - `WITHINGS_PRIVACY_MODE` defaults to `structured`. Raw Withings JSON is opt-in via `raw` mode or per-call override.
+- Structured mode preserves complete upstream physiological fields, including future Withings additions, while removing GPS and secret-bearing values.
 - `withings_revoke_access` clears local tokens; full account-side token revocation depends on your Withings plan.
 - The MCP client never sees access or refresh tokens.
 - This is **not medical advice**. Withings exposes data that may resemble medical signals (ECG, blood pressure) but this server is for personal AI workflows, not diagnosis or treatment.

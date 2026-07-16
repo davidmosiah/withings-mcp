@@ -32,6 +32,15 @@ assert.equal(summary.map, undefined);
 const raw = applyPrivacy('/v2/measure', activity, 'raw');
 assert.equal(raw.map.summary_polyline, 'encoded');
 
+const futureStructured = applyPrivacy('/measure', {
+  grpid: 123,
+  date: 1781056800,
+  measures: [{ type: 1, value: 8000, unit: -2, futureQuality: 99 }],
+  futureMetrics: { vascularAge: 41 },
+}, 'structured');
+assert.equal(futureStructured.measures[0].futureQuality, 99);
+assert.deepEqual(futureStructured.futureMetrics, { vascularAge: 41 });
+
 const streams = normalizeStreams({ heartrate: { data: [120, 121] }, latlng: { data: [[1, 2]] } }, 'structured', false);
 assert.equal(streams.latlng, undefined);
 assert.deepEqual(streams.heartrate.data, [120, 121]);

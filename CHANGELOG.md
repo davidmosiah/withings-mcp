@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.8 - 2026-07-16
+
+### Fixed
+
+- Log redacted per-domain errors from partial daily and weekly summaries to stderr instead of silently hiding upstream failures.
+- Expand the executable endpoint contract to prove that Withings date-time filters retain their instant semantics when converted to Unix timestamps, including offset ISO inputs.
+- Guard structured privacy output against future upstream-field loss while continuing to remove GPS and secret-bearing values.
+
 ## 0.4.7 - 2026-06-27
 
 ### Fixed
