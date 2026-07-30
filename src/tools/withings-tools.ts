@@ -347,12 +347,24 @@ export function registerWithingsTools(server: McpServer): void {
 
   server.registerTool("withings_revoke_access", {
     title: "Clear Withings Local Access",
-    description: "Delete the local Withings token file. Withings token revocation support varies by app/API plan, so this tool only clears local access.",
-    inputSchema: ResponseOnlyInputSchema.shape,
+    description: "Delete the local Withings token file. Withings token revocation support varies by app/API plan, so this tool only clears local access. Gated by explicit_user_intent: true (requires explicit user intent).",
+    inputSchema: {
+      explicit_user_intent: z
+        .boolean()
+        .optional()
+        .describe("Must be true after the user explicitly asked to disconnect. Prevents agents from revoking autonomously."),
+      response_format: z.enum(["markdown", "json"]).default("markdown")
+    },
     outputSchema: RevokeAccessOutputSchema.shape,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
-  }, async ({ response_format }) => {
+  }, async ({ explicit_user_intent, response_format }) => {
     try {
+      if (explicit_user_intent !== true) {
+        return makeError(
+          "USER_ACTION_REQUIRED: explicit_user_intent must be true to revoke access. Ask the user to confirm disconnect first."
+        );
+      }
+
       const result = await client().revokeAccess();
       const output = { ...result, note: "Local Withings tokens were removed. Re-authorize before future API calls." };
       return makeResponse(output, response_format, bulletList("Withings Local Access Cleared", output));

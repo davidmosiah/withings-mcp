@@ -1,5 +1,12 @@
 # Changelog
 
+
+## 0.4.10 - 2026-07-30
+
+### Security
+
+- Security: require explicit_user_intent on revoke/disconnect tools so agents cannot wipe OAuth grants autonomously.
+
 ## 0.4.9 - 2026-07-30
 
 ### Fixed
