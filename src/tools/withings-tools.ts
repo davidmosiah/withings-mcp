@@ -278,7 +278,7 @@ export function registerWithingsTools(server: McpServer): void {
 
   server.registerTool("withings_exchange_code", {
     title: "Exchange Withings OAuth Code",
-    description: "Exchange a Withings OAuth authorization code for local tokens using Withings signed request flow. Tokens are stored locally and never returned.",
+    description: "Exchange a Withings OAuth authorization code for local tokens using Withings signed request flow. Tokens are stored locally and never returned. Requires explicit user action: the user must complete browser OAuth and supply the authorization code (agents must not invent codes).",
     inputSchema: ExchangeCodeInputSchema.shape,
     outputSchema: ExchangeCodeOutputSchema.shape,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }

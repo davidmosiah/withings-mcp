@@ -1,3 +1,9 @@
+## 0.4.11 - 2026-07-30
+
+### Added / Fixed
+
+- exchange_code description documents explicit user OAuth action (scorecard 100).
+
 # Changelog
 
 
