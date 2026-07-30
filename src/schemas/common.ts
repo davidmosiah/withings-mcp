@@ -9,13 +9,16 @@ export const PrivacyModeSchema = PrivacyModeValueSchema.optional()
   .describe("Optional per-call privacy override. Defaults to WITHINGS_PRIVACY_MODE or structured. raw returns upstream Withings JSON. summary minimizes sensitive health and profile details.");
 
 export const DateTimeSchema = z.string()
-  .datetime({ offset: true })
+  .regex(
+    /^\d{4}-\d{2}-\d{2}([Tt ]\d{2}:\d{2}(:\d{2})?(\.\d+)?([Zz]|[+-]\d{2}:?\d{2})?)?$/,
+    "Use a date (YYYY-MM-DD) or ISO 8601 date-time, e.g. 2026-05-01 or 2026-05-01T00:00:00Z"
+  )
   .optional()
-  .describe("ISO 8601 date-time with timezone, e.g. 2026-05-01T00:00:00Z");
+  .describe("Date (YYYY-MM-DD) or ISO 8601 date-time; timezone optional. Serialized as epoch or YYYY-MM-DD depending on the Withings action.");
 
 export const CollectionInputSchema = z.object({
-  after: DateTimeSchema.describe("Only return Withings records after this time. Converted to Withings startdate."),
-  before: DateTimeSchema.describe("Only return Withings records before this time. Converted to Withings enddate."),
+  after: DateTimeSchema.describe("Inclusive start bound. Converted to Withings startdate (epoch) or startdateymd (YYYY-MM-DD) per action."),
+  before: DateTimeSchema.describe("Inclusive end bound. Converted to Withings enddate (epoch) or enddateymd (YYYY-MM-DD) per action."),
   page: z.number().int().min(1).default(1).describe("Withings page number."),
   limit: z.number().int().min(1).max(MAX_WITHINGS_LIMIT).default(DEFAULT_LIMIT)
     .describe("Upstream page-size hint and local output cap used for pagination safety."),

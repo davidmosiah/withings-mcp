@@ -81,11 +81,15 @@ async function safeGet(client: Pick<WithingsClient, "get">, endpoint: string, pa
 }
 
 async function dailyBundle(client: Pick<WithingsClient, "get">, date: string) {
+  // getactivity + sleep getsummary require civil dates (startdateymd/enddateymd).
+  // getmeas + heart list require Unix epoch seconds (startdate/enddate).
+  // Previously every domain used epoch, so activity/sleep summary filters were malformed
+  // (same class of vendor date-param bugs as polar-mcp #4).
   const startdate = epochSeconds(date);
   const enddate = startdate + 86_399;
   const [activity, sleep, measures, heart] = await Promise.all([
-    safeGet(client, "/v2/measure", { action: "getactivity", startdate, enddate }),
-    safeGet(client, "/v2/sleep", { action: "getsummary", startdate, enddate, data_fields: SLEEP_SUMMARY_FIELDS }),
+    safeGet(client, "/v2/measure", { action: "getactivity", startdateymd: date, enddateymd: date }),
+    safeGet(client, "/v2/sleep", { action: "getsummary", startdateymd: date, enddateymd: date, data_fields: SLEEP_SUMMARY_FIELDS }),
     safeGet(client, "/measure", { action: "getmeas", startdate, enddate }),
     safeGet(client, "/v2/heart", { action: "list", startdate, enddate })
   ]);

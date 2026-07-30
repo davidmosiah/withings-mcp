@@ -3,9 +3,11 @@ import { buildDailySummary, buildWeeklySummary } from '../dist/services/summary.
 import { buildWellnessContext } from '../dist/services/context.js';
 
 const today = new Date().toISOString().slice(0, 10);
+const summaryCalls = [];
 
 const fakeClient = {
-  async get(endpoint) {
+  async get(endpoint, params) {
+    summaryCalls.push({ endpoint, params: { ...(params ?? {}) } });
     if (endpoint.includes('/v2/measure')) {
       return { body: { activities: [{ date: today, steps: 9000, calories: 520, distance: 7200, active_duration: 3600 }] } };
     }
@@ -29,6 +31,27 @@ assert.equal(daily.scorecard.sleep_minutes, 430);
 assert.equal(daily.scorecard.average_heart_rate, 58);
 assert.equal(daily.scorecard.weight_kg, 80);
 assert.ok(daily.diagnostic.action_candidates.length >= 2);
+
+// Summary must use civil ymd params for activity + sleep summary, epoch for measures + heart.
+const activityCall = summaryCalls.find((call) => call.params.action === 'getactivity');
+const sleepSummaryCall = summaryCalls.find((call) => call.params.action === 'getsummary');
+const measuresCall = summaryCalls.find((call) => call.params.action === 'getmeas');
+const heartCall = summaryCalls.find((call) => call.params.action === 'list');
+assert.ok(activityCall, 'daily summary must request getactivity');
+assert.equal(activityCall.params.startdateymd, today);
+assert.equal(activityCall.params.enddateymd, today);
+assert.equal(activityCall.params.startdate, undefined);
+assert.ok(sleepSummaryCall, 'daily summary must request sleep getsummary');
+assert.equal(sleepSummaryCall.params.startdateymd, today);
+assert.equal(sleepSummaryCall.params.enddateymd, today);
+assert.equal(sleepSummaryCall.params.startdate, undefined);
+assert.ok(measuresCall);
+assert.equal(typeof measuresCall.params.startdate, 'number');
+assert.equal(typeof measuresCall.params.enddate, 'number');
+assert.equal(measuresCall.params.startdateymd, undefined);
+assert.ok(heartCall);
+assert.equal(typeof heartCall.params.startdate, 'number');
+assert.equal(heartCall.params.startdateymd, undefined);
 
 const weekly = await buildWeeklySummary(fakeClient, { days: 7, compare_days: 7, timezone: 'UTC' });
 assert.equal(weekly.kind, 'weekly_summary');

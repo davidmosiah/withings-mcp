@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.9 - 2026-07-30
+
+### Fixed
+
+- **Date param style by Withings action (polar-mcp #4 class).** `getactivity`, `getworkouts`, and sleep `getsummary` now send `startdateymd` / `enddateymd` as `YYYY-MM-DD`. Epoch-style actions (`getmeas`, sleep detail `get`, heart `list`) still send `startdate` / `enddate` Unix seconds. Previously every list/summary path used epoch params, so activity/workout/sleep-summary filters were malformed or dropped upstream.
+- **Daily/weekly summary** now uses ymd params for activity + sleep summary (and keeps epoch for measures + heart).
+- Accept plain `YYYY-MM-DD` on collection `after` / `before` (agents rarely pass offset-qualified ISO). Date-only epoch bounds expand to start/end of UTC day.
+
 ## 0.4.8 - 2026-07-16
 
 ### Fixed

@@ -298,6 +298,18 @@ const INTERNAL_LIST_PARAM_KEYS = new Set([
   "response_format"
 ]);
 
+// Withings is inconsistent across actions (same class of vendor bug as Polar #4):
+// - getmeas / sleep get / heart list → startdate/enddate as Unix epoch seconds
+// - getactivity / getworkouts / sleep getsummary → startdateymd/enddateymd as YYYY-MM-DD
+// Sending epoch params to ymd endpoints is ignored or rejected, so filters silently drop.
+const YMD_DATE_ACTIONS = new Set(["getactivity", "getworkouts", "getsummary"]);
+
+export type WithingsDateParamStyle = "epoch" | "ymd";
+
+export function dateParamStyleForAction(action: unknown): WithingsDateParamStyle {
+  return typeof action === "string" && YMD_DATE_ACTIONS.has(action) ? "ymd" : "epoch";
+}
+
 function buildListRequestParams(params: ListParams & WithingsActionParams, offset: number, limit: number): WithingsActionParams {
   return {
     ...pickUpstreamParams(params),
@@ -311,7 +323,18 @@ function pickUpstreamParams(params: WithingsActionParams): WithingsActionParams 
   return Object.fromEntries(Object.entries(params).filter(([key]) => !INTERNAL_LIST_PARAM_KEYS.has(key))) as WithingsActionParams;
 }
 
-function withingsDateRange(params: ListParams): Record<string, number> {
+function withingsDateRange(params: ListParams & WithingsActionParams): Record<string, string | number> {
+  const style = dateParamStyleForAction(params.action);
+  if (style === "ymd") {
+    const range: Record<string, string> = {};
+    if (params.after) range.startdateymd = toYmdDate(params.after, "after");
+    if (params.before) range.enddateymd = toYmdDate(params.before, "before");
+    if (range.startdateymd && range.enddateymd && range.startdateymd > range.enddateymd) {
+      throw new Error("Invalid Withings date range: after must be earlier than before.");
+    }
+    return range;
+  }
+
   const range: Record<string, number> = {};
   if (params.after) range.startdate = toEpochSeconds(params.after, "after");
   if (params.before) range.enddate = toEpochSeconds(params.before, "before");
@@ -321,10 +344,33 @@ function withingsDateRange(params: ListParams): Record<string, number> {
   return range;
 }
 
-function toEpochSeconds(value: string, field: "after" | "before"): number {
+function toYmdDate(value: string, field: "after" | "before"): string {
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})(?:$|[Tt ])/);
+  if (match) {
+    const date = match[1];
+    const parsed = new Date(`${date}T00:00:00Z`);
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+      throw new Error(`Invalid Withings ${field} filter: ${value}`);
+    }
+    return date;
+  }
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) {
-    throw new Error(`Invalid Withings ${field} filter: use an ISO 8601 date-time with timezone, for example 2026-06-09T00:00:00Z.`);
+    throw new Error(`Invalid Withings ${field} filter: use YYYY-MM-DD or an ISO 8601 date-time, for example 2026-06-09 or 2026-06-09T00:00:00Z.`);
+  }
+  return new Date(parsed).toISOString().slice(0, 10);
+}
+
+function toEpochSeconds(value: string, field: "after" | "before"): number {
+  const trimmed = value.trim();
+  // Date-only bounds expand to start/end of UTC day so a plain before=YYYY-MM-DD keeps the final day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const suffix = field === "before" ? "T23:59:59Z" : "T00:00:00Z";
+    return Math.floor(Date.parse(`${trimmed}${suffix}`) / 1000);
+  }
+  const parsed = Date.parse(trimmed);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid Withings ${field} filter: use YYYY-MM-DD or an ISO 8601 date-time with timezone, for example 2026-06-09 or 2026-06-09T00:00:00Z.`);
   }
   return Math.floor(parsed / 1000);
 }

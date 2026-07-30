@@ -133,8 +133,8 @@ This package uses the official Withings Public API. When this README says `raw`,
 
 **Body & metrics**
 
-- `withings_list_body_measures` — punctual weight/composition records. Use ISO 8601 `after` / `before` windows for large histories; the server sends Withings `startdate` / `enddate` upstream and caps returned records with `limit`.
-- Withings filters intentionally preserve the instant represented by an offset ISO date-time when converting it to Unix `startdate` / `enddate` values.
+- `withings_list_body_measures` — punctual weight/composition records. Use `after` / `before` as `YYYY-MM-DD` or ISO 8601 for large histories; the server sends Withings `startdate` / `enddate` (Unix seconds) upstream and caps returned records with `limit`.
+- Date filters are action-aware: `getactivity` / `getworkouts` / sleep `getsummary` send civil `startdateymd` / `enddateymd`; `getmeas`, sleep detail, and heart list keep epoch `startdate` / `enddate`. Offset ISO instants keep their exact epoch conversion on epoch-style actions.
 - `withings_list_heart` — heart records when device/plan permit
 
 **Activity**
