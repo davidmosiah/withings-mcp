@@ -26,11 +26,13 @@ import { z } from "zod";
 import { buildAgentManifest, formatAgentManifestMarkdown } from "../services/agent-manifest.js";
 import { buildPrivacyAudit } from "../services/audit.js";
 import { buildCapabilities } from "../services/capabilities.js";
+import { buildCollectionOutput } from "../services/collection.js";
+import { buildDemoPayload } from "../services/demo.js";
 import { buildDataInventory, formatInventoryMarkdown } from "../services/inventory.js";
 import { buildConnectionStatus } from "../services/connection-status.js";
 import { getConfig } from "../services/config.js";
 import { bulletList, formatCollection, makeError, makeResponse } from "../services/format.js";
-import { applyPrivacy, resolvePrivacyMode } from "../services/privacy.js";
+import { resolvePrivacyMode } from "../services/privacy.js";
 import {
   buildProfileSummary,
   getOnboardingFlow,
@@ -80,17 +82,8 @@ function registerCollectionTool(server: McpServer, name: string, title: string, 
         const config = getConfig();
         const privacyMode = resolvePrivacyMode(config, params.privacy_mode);
         const result = await new WithingsClient(config).list(endpoint, { ...params, action, ...extra });
-        const records = applyPrivacy(endpoint, { records: result.records }, privacyMode) as { records: unknown[] };
-        const output = {
-          endpoint,
-          privacy_mode: privacyMode,
-          count: records.records.length,
-          records: records.records,
-          next_page: result.next_page,
-          has_more: Boolean(result.next_page),
-          pages_fetched: result.pages_fetched
-        };
-        return makeResponse(output, params.response_format, formatCollection(title, records.records, output));
+        const output = buildCollectionOutput(endpoint, privacyMode, result);
+        return makeResponse(output, params.response_format, formatCollection(title, output.records, output));
       } catch (error) {
         return makeError((error as Error).message);
       }
@@ -211,49 +204,12 @@ export function registerWithingsTools(server: McpServer): void {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
     async ({ response_format }) => {
-      const today = new Date().toISOString().slice(0, 10);
-      const payload = {
-        ok: true,
-        is_demo: true,
-        sample: {
-          withings_daily_summary: {
-            date: today,
-            body: { weight_kg: 72.5, body_fat_pct: 18.5, muscle_mass_kg: 56.1, water_pct: 58.4, bone_mass_kg: 3.2 },
-            blood_pressure: { systolic_mmhg: 118, diastolic_mmhg: 76, heart_rate_bpm: 62 },
-            sleep: { sleep_score: 78, total_sleep_min: 448, sleep_efficiency: 0.91, deep_min: 84, rem_min: 96, light_min: 268, hr_average_bpm: 56, hr_min_bpm: 50 },
-            activity: { steps: 8_421, active_calories: 489, distance_m: 6_870, moderate_min: 41, intense_min: 12 },
-          },
-          withings_wellness_context: {
-            window: "last_24h",
-            sleep_score: 78,
-            sleep_duration_min: 448,
-            weight_kg: 72.5,
-            body_fat_pct: 18.5,
-            blood_pressure: "118/76",
-            resting_hr_bpm: 56,
-            recommendation: "Solid sleep duration (7h28m) and stable weight trend — good baseline for moderate training today. Hydrate before noon; resting HR is slightly elevated.",
-          },
-          withings_list_body_measures: {
-            count: 3,
-            records: [
-              { date: today, weight_kg: 72.5, body_fat_pct: 18.5, muscle_mass_kg: 56.1 },
-              { date: yesterdayISO(), weight_kg: 72.7, body_fat_pct: 18.7, muscle_mass_kg: 55.9 },
-              { date: dayBeforeISO(), weight_kg: 72.9, body_fat_pct: 18.9, muscle_mass_kg: 55.8 },
-            ],
-          },
-        },
-        notes: [
-          "All sample data is synthetic; tagged with is_demo=true.",
-          "Real calls return live data from the Withings Public API after OAuth setup.",
-        ],
-      };
+      const payload = buildDemoPayload();
       const markdown = bulletList("Withings Demo", {
         is_demo: true,
-        weight_kg: 72.5,
-        body_fat_pct: 18.5,
-        blood_pressure: "118/76",
-        sleep_duration: "7h28m",
-        recommendation: payload.sample.withings_wellness_context.recommendation,
+        daily_summary_scorecard: "steps, calories, distance_m, active_minutes, sleep_*, average_heart_rate, weight_kg",
+        wellness_context: payload.sample.withings_wellness_context.telegram_summary,
+        body_measures: "raw Withings groups; decode each measure as value * 10 ** unit",
       });
       return makeResponse(payload, response_format, markdown);
     }
@@ -533,12 +489,4 @@ export function registerWithingsTools(server: McpServer): void {
       }
     }
   );
-}
-
-function yesterdayISO(): string {
-  return new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-}
-
-function dayBeforeISO(): string {
-  return new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
 }

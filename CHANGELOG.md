@@ -1,3 +1,42 @@
+## 0.5.0 - 2026-08-01
+
+### Fixed
+
+- **`withings_demo` described a server that does not exist.** The tool exists so an agent can
+  learn the payload shape before spending an OAuth round-trip — and every one of its three
+  examples had drifted from the real builders. An agent that trusted it wrote a parser for
+  fields that never arrive:
+  - `withings_daily_summary`: **26 invented keys, 37 real keys missing**. The example advertised
+    `body`, `blood_pressure`, `sleep` and `activity` objects. The builder returns none of them —
+    it returns a flat `scorecard` inside `kind` / `generated_at` / `window` / `data_quality` /
+    `diagnostic` / `safety`. Not one key matched.
+  - `withings_wellness_context`: **7 invented keys, 14 missing**. `recommendation`, presented as
+    the payload's main deliverable, does not exist — the context tool hands structured signals to
+    another agent instead of advising. `sleep_score` was the only field that was ever real.
+  - `withings_list_body_measures`: **3 invented keys, 14 missing**. The example promised decoded
+    `weight_kg` / `body_fat_pct` / `muscle_mass_kg` per record. Withings returns measure *groups*:
+    `measures: [{ value: 72500, type: 1, unit: -3 }]`, where the real number is `value * 10 ** unit`
+    and `type` is a measure-type code. An agent following the demo had no reason to implement that
+    decoding — and a naive fallback to `measures[0].value` reports **72500 kg**. It also omitted
+    `endpoint`, `privacy_mode`, `next_page`, `has_more` and `pages_fetched`, so paging was invisible.
+- The demo now shows what the tools actually return, including the value/unit decoding rule and
+  where blood pressure really lives (`withings_list_body_measures`, not the daily scorecard).
+
+### Added
+
+- `npm run test:demo-contract` (wired into `npm test`): runs the real `buildDailySummary`,
+  `buildWellnessContext` and `buildCollectionOutput` over a stubbed Withings transport, then
+  compares key paths against the demo and **fails in both directions** — keys the demo invents and
+  contract keys the demo omits. The collection sample is checked against the union of a
+  more-results page and a last page, so `next_page` cannot silently vanish from the example.
+  This is what makes the drift above impossible to reintroduce quietly.
+
+### Changed
+
+- Collection payload shaping moved to `src/services/collection.ts` (`buildCollectionOutput`) and the
+  demo payload to `src/services/demo.ts` (`buildDemoPayload`), so the gate can exercise the real code
+  instead of re-describing it. Tool responses are byte-identical.
+
 ## 0.4.11 - 2026-07-30
 
 ### Added / Fixed
