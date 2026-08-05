@@ -1,3 +1,4 @@
-# Empty export warn
+# Empty export warning
 
-Zero-row exports should warn explicitly, not look like success.
+`buildCollectionOutput` sets `empty: true` and a `warning` string when a list/export returns zero rows.
+Markdown channel also surfaces the warning so agents do not treat empty as success.

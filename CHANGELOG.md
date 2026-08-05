@@ -1,3 +1,9 @@
+## 0.5.1 - 2026-08-05
+
+### Added
+- Empty list/export warning: `empty` + `warning` on collection outputs when zero rows.
+
+
 ## 0.5.0 - 2026-08-01
 
 ### Fixed

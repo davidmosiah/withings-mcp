@@ -161,7 +161,8 @@ function demoBodyMeasures() {
     ],
     next_page: 2,
     has_more: true,
-    pages_fetched: 1
+    pages_fetched: 1,
+    empty: false
   };
 }
 

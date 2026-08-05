@@ -33,6 +33,10 @@ export function formatCollection(title: string, records: unknown[], meta: Record
     .filter(([key, value]) => key !== "records" && value !== undefined && value !== null)
     .map(([key, value]) => `- **${key}**: ${formatMarkdownValue(value)}`);
   const lines = [`# ${title}`, "", ...metaLines, ""];
+  if (records.length === 0 || meta.empty === true) {
+    lines.push("**warning**: Export/list returned zero rows. Treat as empty dataset, not as successful data presence.");
+    lines.push("");
+  }
   const preview = records.slice(0, 8);
   for (const [index, record] of preview.entries()) {
     if (record && typeof record === "object") {

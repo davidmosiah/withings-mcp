@@ -115,7 +115,9 @@ export const CollectionOutputSchema = z.object({
   records: z.array(z.unknown()),
   next_page: z.number().int().positive().optional(),
   has_more: z.boolean(),
-  pages_fetched: z.number().int().nonnegative()
+  pages_fetched: z.number().int().nonnegative(),
+  empty: z.boolean().optional(),
+  warning: z.string().optional()
 }).strict();
 
 export const CacheStatusOutputSchema = z.object({
