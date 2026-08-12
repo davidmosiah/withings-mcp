@@ -33,6 +33,19 @@
 
 ---
 
+## HTTP (v2 stateless)
+
+Default is **stdio**. Optional Streamable HTTP — no session id, JSON responses, loopback only:
+
+```bash
+npx -y withings-mcp-unofficial --http
+# GET  http://127.0.0.1:3000/health
+# POST http://127.0.0.1:3000/mcp   (sessionless)
+```
+
+Env: `WITHINGS_MCP_HOST`, `WITHINGS_MCP_PORT`, `WITHINGS_MCP_TRANSPORT=http`.
+
+
 <!-- /delx-wellness header v2 -->
 
 **Local-first MCP server that connects AI agents to your Withings body, sleep, activity and heart data.**
