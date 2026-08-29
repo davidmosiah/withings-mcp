@@ -281,3 +281,13 @@ MIT — see [LICENSE](LICENSE).
 ## Disclaimer
 
 This software is provided as-is. It is not a medical device, does not provide medical advice, and should not be used for diagnosis or treatment. Withings exposes data that may resemble medical signals (ECG, blood pressure, body composition) — always consult qualified professionals for medical concerns.
+
+## Skill or MCP
+
+Same package, two doors. MCP registers tools on stdio/HTTP. The [skill](skill/SKILL.md) can drive the **same** tools through the CLI when the client has no MCP:
+
+```bash
+npx -y withings-mcp-unofficial call withings_connection_status --json '{}'
+```
+
+Copy `skill/SKILL.md` into your agent skills dir.
