@@ -8,6 +8,7 @@ import { SERVER_NAME, SERVER_VERSION } from "./constants.js";
 import { runCliCommand } from "./cli/commands.js";
 import { registerWithingsPrompts } from "./prompts/withings-prompts.js";
 import { registerWithingsResources } from "./resources/withings-resources.js";
+import { installClientSafeToolSchemas } from "./services/client-safe-json-schema.js";
 import { registerWithingsTools } from "./tools/withings-tools.js";
 
 function createServer(): McpServer {
@@ -17,6 +18,7 @@ function createServer(): McpServer {
   });
 
   registerWithingsTools(server);
+  installClientSafeToolSchemas(server);
   registerWithingsResources(server);
   registerWithingsPrompts(server);
   return server;
