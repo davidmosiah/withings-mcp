@@ -1,12 +1,24 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import http from 'node:http';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import { assertClientToolSchemas, createClientSchemaValidator } from './client-schema-test-helpers.mjs';
 
 const port = String(43000 + Math.floor(Math.random() * 1000));
 const healthCheckAttempts = 100;
 const healthCheckDelayMs = 200;
+const home = await mkdtemp(join(tmpdir(), 'withings-mcp-http-smoke-'));
+const schemaValidator = createClientSchemaValidator();
+const client = new Client({ name: 'withings-http-smoke-test', version: '0.0.0' }, {
+  jsonSchemaValidator: new AjvJsonSchemaValidator(schemaValidator)
+});
 const child = spawn(process.execPath, ['dist/index.js', '--http'], {
-  env: { ...process.env, WITHINGS_MCP_PORT: port, WITHINGS_MCP_HOST: '127.0.0.1' },
+  env: { PATH: process.env.PATH ?? '', HOME: home, USERPROFILE: home, WITHINGS_MCP_PORT: port, WITHINGS_MCP_HOST: '127.0.0.1' },
   stdio: ['ignore', 'ignore', 'pipe']
 });
 
@@ -46,7 +58,14 @@ try {
     }
   }
   if (!ok) throw new Error(`HTTP server did not become healthy. stderr=${stderr}`);
-  console.log(JSON.stringify({ ok: true, transport: 'http', port: Number(port) }, null, 2));
+  await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
+  const { tools } = await client.listTools();
+  const schemas = assertClientToolSchemas(tools, schemaValidator);
+  const result = await client.callTool({ name: 'withings_capabilities', arguments: { response_format: 'json' } });
+  assert.equal(result.structuredContent?.unofficial, true);
+  console.log(JSON.stringify({ ok: true, transport: 'http', schemas, port: Number(port) }, null, 2));
 } finally {
+  await client.close();
   child.kill('SIGTERM');
+  await rm(home, { recursive: true, force: true });
 }
