@@ -12,6 +12,7 @@ export interface ListParams {
   after?: string;
   before?: string;
   page?: number;
+  offset?: number;
   limit?: number;
   all_pages?: boolean;
   max_pages?: number;
@@ -77,14 +78,15 @@ export class WithingsClient {
     return { ...this.getCache().status(), http_cache };
   }
 
-  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number }> {
+  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; next_offset?: number; pages_fetched: number }> {
     const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_WITHINGS_LIMIT);
     const maxPages = params.all_pages ? Math.max(1, params.max_pages ?? 1) : 1;
     const maxRecords = limit * maxPages;
     const records: unknown[] = [];
-    let offset = Math.max(((params.page ?? 1) - 1) * limit, 0);
+    let offset = params.offset ?? Math.max(((params.page ?? 1) - 1) * limit, 0);
     let pages = 0;
     let hasMore = false;
+    let nextOffset: number | undefined;
 
     while (pages < maxPages) {
       const payload = await this.get(path, buildListRequestParams(params, offset, limit));
@@ -94,11 +96,20 @@ export class WithingsClient {
       pages += 1;
       const more = extractMore(payload);
       hasMore = more || pageRecords.length > remaining;
-      if (!params.all_pages || !more || pageRecords.length < limit || records.length >= maxRecords) break;
-      offset += limit;
+      // The API's continuation offset need not equal offset + limit, and a short
+      // page can still have more rows. If our local cap split a vendor page,
+      // resume after the rows actually returned rather than skipping its tail.
+      nextOffset = pageRecords.length > remaining
+        ? offset + remaining
+        : more ? extractOffset(payload) ?? offset + pageRecords.length : undefined;
+      if (hasMore && (nextOffset === undefined || nextOffset <= offset)) {
+        throw new Error("Withings pagination did not advance; refusing an incomplete collection.");
+      }
+      if (!params.all_pages || !hasMore || records.length >= maxRecords) break;
+      offset = nextOffset!;
     }
 
-    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, pages_fetched: pages };
+    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, next_offset: nextOffset, pages_fetched: pages };
   }
 
   private extractCode(input: string): string {
@@ -291,6 +302,7 @@ const INTERNAL_LIST_PARAM_KEYS = new Set([
   "after",
   "before",
   "page",
+  "offset",
   "limit",
   "all_pages",
   "max_pages",
@@ -387,7 +399,13 @@ function extractRecords(payload: unknown): unknown[] {
 
 function extractMore(payload: unknown): boolean {
   const body = isObject(payload) && isObject(payload.body) ? payload.body : payload;
-  return isObject(body) && body.more === true;
+  return isObject(body) && (body.more === true || body.more === 1);
+}
+
+function extractOffset(payload: unknown): number | undefined {
+  const body = isObject(payload) && isObject(payload.body) ? payload.body : payload;
+  return isObject(body) && typeof body.offset === "number" && Number.isSafeInteger(body.offset) && body.offset >= 0
+    ? body.offset : undefined;
 }
 
 function cleanParams(input: WithingsActionParams): Record<string, string | number | boolean> {
