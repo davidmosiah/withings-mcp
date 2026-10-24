@@ -5,6 +5,7 @@ export interface CollectionListResult {
   records: unknown[];
   next_page?: number;
   next_offset?: number;
+  next_cursor?: string;
   pages_fetched: number;
 }
 
@@ -26,7 +27,8 @@ export function buildCollectionOutput(endpoint: string, privacyMode: PrivacyMode
     records: records.records,
     next_page: result.next_page,
     next_offset: result.next_offset,
-    has_more: result.next_offset !== undefined || Boolean(result.next_page),
+    next_cursor: result.next_cursor,
+    has_more: Boolean(result.next_cursor) || result.next_offset !== undefined || Boolean(result.next_page),
     pages_fetched: result.pages_fetched,
     /** True when the export/list returned zero rows — not a success that "has data". */
     empty,

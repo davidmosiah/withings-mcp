@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { URL, URLSearchParams } from "node:url";
 import { DEFAULT_LIMIT, MAX_WITHINGS_LIMIT, WITHINGS_API_BASE_URL, WITHINGS_AUTH_URL, WITHINGS_SIGNATURE_PATH, WITHINGS_TOKEN_PATH } from "../constants.js";
 import type { WithingsConfig, WithingsTokenSet } from "../types.js";
@@ -13,6 +13,7 @@ export interface ListParams {
   before?: string;
   page?: number;
   offset?: number;
+  cursor?: string;
   limit?: number;
   all_pages?: boolean;
   max_pages?: number;
@@ -78,7 +79,7 @@ export class WithingsClient {
     return { ...disabledCacheStatus(this.config.cachePath), http_cache };
   }
 
-  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; next_offset?: number; pages_fetched: number }> {
+  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; next_offset?: number; next_cursor?: string; pages_fetched: number }> {
     const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_WITHINGS_LIMIT);
     const maxPages = params.all_pages ? Math.max(1, params.max_pages ?? 1) : 1;
     const maxRecords = limit * maxPages;
@@ -91,33 +92,50 @@ export class WithingsClient {
       throw new Error("Withings account identity is unavailable for pagination. Re-authorize before retrying.");
     }
     const records: unknown[] = [];
+    const canonical = Object.fromEntries(Object.entries(buildListRequestParams(params, 0, limit)).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+    const fingerprint = createHash("sha256").update(path + JSON.stringify(canonical)).digest("base64url");
     let offset = params.offset ?? Math.max(((params.page ?? 1) - 1) * limit, 0);
+    let skip = 0;
+    if (params.cursor) {
+      const cursor = decodeCursor(params.cursor);
+      if (cursor.fingerprint !== fingerprint) throw new Error("Withings continuation requires the same endpoint, filters and page size.");
+      offset = cursor.offset;
+      skip = cursor.skip;
+    }
     let pages = 0;
-    let hasMore = false;
     let nextOffset: number | undefined;
+    let nextCursor: string | undefined;
 
     while (pages < maxPages) {
       const payload = await this.request(path, buildListRequestParams(params, offset, limit), paginationUser);
       const pageRecords = extractRecords(payload);
+      if (skip > pageRecords.length) throw new Error("Withings page changed; start the query again.");
       const remaining = maxRecords - records.length;
-      records.push(...pageRecords.slice(0, remaining));
+      const available = pageRecords.slice(skip);
+      records.push(...available.slice(0, remaining));
       pages += 1;
-      const more = extractMore(payload);
-      hasMore = more || pageRecords.length > remaining;
-      // The API's continuation offset need not equal offset + limit, and a short
-      // page can still have more rows. If our local cap split a vendor page,
-      // resume after the rows actually returned rather than skipping its tail.
-      nextOffset = pageRecords.length > remaining
-        ? offset + remaining
-        : more ? extractOffset(payload) ?? offset + pageRecords.length : undefined;
-      if (hasMore && (nextOffset === undefined || nextOffset <= offset)) {
+      if (available.length > remaining) {
+        // A local cap split a vendor page. Refetch that exact page and skip only
+        // rows already delivered; never invent a vendor continuation offset.
+        nextOffset = undefined;
+        nextCursor = encodeCursor({ offset, skip: skip + remaining, fingerprint });
+        break;
+      }
+      if (!extractMore(payload)) { nextOffset = undefined; nextCursor = undefined; break; }
+      nextOffset = extractOffset(payload);
+      if (nextOffset === undefined || nextOffset <= offset) {
         throw new Error("Withings pagination did not advance; refusing an incomplete collection.");
       }
-      if (!params.all_pages || !hasMore || records.length >= maxRecords) break;
-      offset = nextOffset!;
+      nextCursor = encodeCursor({ offset: nextOffset, skip: 0, fingerprint });
+      if (!params.all_pages || records.length >= maxRecords) break;
+      offset = nextOffset;
+      skip = 0;
     }
 
-    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, next_offset: nextOffset, pages_fetched: pages };
+    // A legacy page number is safe only when it exactly represents the vendor's
+    // offset. Never advertise an estimate that can silently skip rows.
+    const nextPage = nextOffset !== undefined && nextOffset % limit === 0 ? nextOffset / limit + 1 : undefined;
+    return { records, next_page: nextPage, next_offset: nextOffset, next_cursor: nextCursor, pages_fetched: pages };
   }
 
   private extractCode(input: string): string {
@@ -311,6 +329,7 @@ const INTERNAL_LIST_PARAM_KEYS = new Set([
   "before",
   "page",
   "offset",
+  "cursor",
   "limit",
   "all_pages",
   "max_pages",
@@ -396,13 +415,16 @@ function toEpochSeconds(value: string, field: "after" | "before"): number {
 }
 
 function extractRecords(payload: unknown): unknown[] {
-  const body = isObject(payload) && isObject(payload.body) ? payload.body : payload;
+  if (!isObject(payload) || payload.status !== 0) {
+    throw new Error("Withings response did not include a successful collection envelope.");
+  }
+  const body = "body" in payload ? payload.body : payload;
   if (Array.isArray(body)) return body;
-  if (!isObject(body)) return [];
+  if (!isObject(body)) throw new Error("Withings response did not include a recognized collection.");
   for (const key of ["series", "measuregrps", "activities", "workouts", "sleep", "heart", "devices", "records"]) {
     if (Array.isArray(body[key])) return body[key] as unknown[];
   }
-  return [];
+  throw new Error("Withings response did not include a recognized collection.");
 }
 
 function extractMore(payload: unknown): boolean {
@@ -451,4 +473,19 @@ function normalizeUserId(value: unknown): string | undefined {
   if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return String(value);
   if (typeof value === "string" && /^[1-9][0-9]*$/.test(value)) return value;
   return undefined;
+}
+
+interface ListCursor { offset: number; skip: number; fingerprint: string }
+function encodeCursor(cursor: ListCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+function decodeCursor(value: string): ListCursor {
+  try {
+    if (!/^[A-Za-z0-9_-]{1,256}$/.test(value)) throw new Error();
+    const cursor = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    if (!isObject(cursor) || Object.keys(cursor).sort().join(",") !== "fingerprint,offset,skip" ||
+        !Number.isSafeInteger(cursor.offset) || Number(cursor.offset) < 0 ||
+        !Number.isSafeInteger(cursor.skip) || Number(cursor.skip) < 0 || typeof cursor.fingerprint !== "string") throw new Error();
+    return cursor as unknown as ListCursor;
+  } catch { throw new Error("Invalid Withings continuation cursor."); }
 }
