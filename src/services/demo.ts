@@ -128,6 +128,8 @@ function demoWellnessContext(generatedAt: string) {
  */
 function demoBodyMeasures() {
   return {
+    source: "withings",
+    fetched_at: new Date().toISOString(),
     endpoint: "/measure",
     privacy_mode: "structured",
     count: 2,
@@ -136,26 +138,28 @@ function demoBodyMeasures() {
         grpid: 900000001,
         attrib: 0,
         date: epochSeconds(0, 9),
+        measured_at: new Date(epochSeconds(0, 9) * 1000).toISOString(),
         created: epochSeconds(0, 9),
         category: 1,
         deviceid: "0000000000000000000000000000000000000001",
         measures: [
-          { value: 72500, type: 1, unit: -3 },
-          { value: 185, type: 6, unit: -1 },
-          { value: 56100, type: 76, unit: -3 }
+          { value: 72500, type: 1, unit: -3, decoded_value: 72.5, label: "weight", unit_label: "kg" },
+          { value: 185, type: 6, unit: -1, decoded_value: 18.5, label: "fat_ratio", unit_label: "%" },
+          { value: 56100, type: 76, unit: -3, decoded_value: 56.1, label: "muscle_mass", unit_label: "kg" }
         ]
       },
       {
         grpid: 900000002,
         attrib: 0,
         date: epochSeconds(1, 9),
+        measured_at: new Date(epochSeconds(1, 9) * 1000).toISOString(),
         created: epochSeconds(1, 9),
         category: 1,
         deviceid: "0000000000000000000000000000000000000002",
         measures: [
-          { value: 118, type: 10, unit: 0 },
-          { value: 76, type: 9, unit: 0 },
-          { value: 62, type: 11, unit: 0 }
+          { value: 118, type: 10, unit: 0, decoded_value: 118, label: "systolic_pressure", unit_label: "mmHg" },
+          { value: 76, type: 9, unit: 0, decoded_value: 76, label: "diastolic_pressure", unit_label: "mmHg" },
+          { value: 62, type: 11, unit: 0, decoded_value: 62, label: "heart_pulse", unit_label: "bpm" }
         ]
       }
     ],
