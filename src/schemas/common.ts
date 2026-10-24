@@ -21,6 +21,7 @@ export const CollectionInputSchema = z.object({
   before: DateTimeSchema.describe("Inclusive end bound. Converted to Withings enddate (epoch) or enddateymd (YYYY-MM-DD) per action."),
   page: z.number().int().min(1).default(1).describe("Legacy page-number offset estimate. Prefer offset from next_offset for exact continuation."),
   offset: z.number().int().min(0).optional().describe("Exact continuation offset returned as next_offset by the previous call. Takes precedence over page."),
+  cursor: z.string().min(1).max(256).optional().describe("Exact next_cursor from the previous response, with the same filters and page size. Takes precedence over offset and page; preserves a locally truncated vendor page."),
   limit: z.number().int().min(1).max(MAX_WITHINGS_LIMIT).default(DEFAULT_LIMIT)
     .describe("Upstream page-size hint and local output cap used for pagination safety."),
   all_pages: z.boolean().default(false).describe("Fetch multiple pages up to max_pages."),
@@ -116,6 +117,7 @@ export const CollectionOutputSchema = z.object({
   records: z.array(z.unknown()),
   next_page: z.number().int().positive().optional(),
   next_offset: z.number().int().nonnegative().optional(),
+  next_cursor: z.string().optional(),
   has_more: z.boolean(),
   pages_fetched: z.number().int().nonnegative(),
   empty: z.boolean().optional(),

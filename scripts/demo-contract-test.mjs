@@ -107,6 +107,7 @@ const STUB_CONFIG = {
 async function realCollection({ more }) {
   const client = new WithingsClient(STUB_CONFIG);
   client.get = async () => ({
+    status: 0,
     body: { measuregrps: [MEASUREGRP], more, offset: more ? 1 : 0 }
   });
   const result = await client.list('/measure', { action: 'getmeas', limit: 1 });

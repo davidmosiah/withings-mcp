@@ -294,8 +294,16 @@ Copy `skill/SKILL.md` into your agent skills dir.
 
 ### Exact list continuation
 
-Collection tools accept `offset` and return `next_offset` when more rows remain.
-Pass that value back with the same filters; it takes precedence over the legacy
-`page` estimate. Withings can return numeric `more: 1`, short pages, and offsets
-that differ from the requested page size. `all_pages` follows these offsets up to
-`max_pages`; a response with `has_more: true` is a partial export.
+Collection tools return `next_cursor` when more rows remain. Pass it back as
+`cursor` with the same filters and page size. It preserves a vendor page that
+was split by the local output cap without inventing an intermediate API offset.
+Withings can return numeric `more: 1`, short pages, and offsets that differ from
+the requested page size. `all_pages` follows vendor offsets up to `max_pages`;
+`has_more: true` means a partial export.
+
+A completed vendor page also exposes `next_offset`; pass it as `offset` for
+explicit continuation. Legacy `next_page` is present only when it represents that
+exact offset. `cursor` takes precedence over `offset`, which takes precedence
+over `page`. Invalid or mismatched cursors, stalled/missing vendor offsets, and
+unrecognized collection payloads fail explicitly rather than appearing complete
+or empty. An actual recognized empty collection remains a valid empty result.
