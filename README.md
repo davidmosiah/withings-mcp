@@ -304,3 +304,16 @@ Legacy SQLite files are not opened, read, changed or deleted by requests or cach
 status checks. They may still contain historical health data: remove them manually
 when no longer needed. Generic HTTP caching also bypasses Authorization,
 Proxy-Authorization and Cookie headers, case-insensitively.
+
+### Body-measure values and timestamps
+
+Structured and summary body-measure groups include `measured_at` (UTC ISO 8601)
+and decoded measures: `decoded_value = value * 10 ** unit`, with documented
+`label` and `unit_label` for known types. Original value, exponent, type and
+future fields remain intact. Unknown types retain their numeric data without
+guessing a physical unit; raw JSON remains unchanged.
+
+Collection metadata distinguishes `fetched_at` from the actual measurement time
+and identifies `source: "withings"`. Markdown previews display decoded scale
+values and units instead of the generic activity fields. Measurement type units
+follow the [official API reference](https://developer.withings.com/api-reference/#operation/measure-getmeas).
