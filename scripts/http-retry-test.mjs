@@ -122,7 +122,7 @@ const logger = (m) => { log.push(m); };
     fetchImpl, sleep: sleepRecord, jitterRandom: () => 0.5, logger
   });
   assert.equal(out.status, 200);
-  assert.match(log[0], /error=fetch failed/);
+  assert.match(log[0], /error=network_failure/);
 }
 
 // Exhausted network errors → throw

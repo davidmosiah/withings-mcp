@@ -291,3 +291,12 @@ npx -y withings-mcp-unofficial call withings_connection_status --json '{}'
 ```
 
 Copy `skill/SKILL.md` into your agent skills dir.
+
+### Request deadlines
+
+Each HTTP operation has a ten-second total deadline, including retries and
+response-body reads. Disabling retries does not disable the deadline. A
+`Retry-After` longer than the remaining budget returns the API failure immediately
+instead of sleeping indefinitely or retrying earlier than the provider permits.
+Retry logs contain status codes or a generic network-failure category, never
+arbitrary exception messages that can contain credentials or health data.
