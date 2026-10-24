@@ -1,4 +1,6 @@
-import { constants, promises as fs } from "node:fs";
+import { promises as fs } from "node:fs";
+import { randomUUID } from "node:crypto";
+import Database from "better-sqlite3";
 import { dirname } from "node:path";
 import type { WithingsTokenSet } from "../types.js";
 
@@ -13,7 +15,7 @@ export class TokenStore {
   constructor(private readonly tokenPath: string) {}
 
   private get lockPath(): string {
-    return `${this.tokenPath}.lock`;
+    return `${this.tokenPath}.lock.sqlite`;
   }
 
   async read(): Promise<WithingsTokenSet | null> {
@@ -28,10 +30,20 @@ export class TokenStore {
 
   async write(tokens: WithingsTokenSet): Promise<void> {
     await fs.mkdir(dirname(this.tokenPath), { recursive: true, mode: 0o700 });
-    const tmp = `${this.tokenPath}.tmp-${process.pid}`;
-    await fs.writeFile(tmp, JSON.stringify(tokens, null, 2), { mode: 0o600 });
-    await fs.rename(tmp, this.tokenPath);
-    await fs.chmod(this.tokenPath, 0o600).catch(() => undefined);
+    const tmp = `${this.tokenPath}.tmp-${randomUUID()}`;
+    try {
+      const handle = await fs.open(tmp, "wx", 0o600);
+      try {
+        await handle.writeFile(JSON.stringify(tokens, null, 2));
+        await handle.sync();
+      } finally { await handle.close(); }
+      await fs.rename(tmp, this.tokenPath);
+      // Persist the rename before a new access token can invalidate its predecessor.
+      if (process.platform !== "win32") {
+        const directory = await fs.open(dirname(this.tokenPath), "r");
+        try { await directory.sync(); } finally { await directory.close(); }
+      }
+    } finally { await fs.unlink(tmp).catch(() => undefined); }
   }
 
   async clear(): Promise<void> {
@@ -42,27 +54,23 @@ export class TokenStore {
 
   async withLock<T>(fn: () => Promise<T>): Promise<T> {
     await fs.mkdir(dirname(this.lockPath), { recursive: true, mode: 0o700 });
+    // Reuse our existing SQLite dependency for an OS-held cross-process lock.
+    // A killed process releases it immediately; never unlink a live lock inode.
+    // No credentials or measurements are stored in this empty lock database.
+    const lock = new Database(this.lockPath, { timeout: 0 });
     const start = Date.now();
-    let handle: fs.FileHandle | null = null;
-
-    while (!handle) {
-      try {
-        handle = await fs.open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR, 0o600);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        if (Date.now() - start > LOCK_TIMEOUT_MS) {
-          throw new Error(`Timed out waiting for token lock: ${this.lockPath}`);
-        }
-        await sleep(LOCK_RETRY_MS);
-      }
-    }
-
     try {
-      await handle.writeFile(`${process.pid}\n${new Date().toISOString()}\n`);
+      await fs.chmod(this.lockPath, 0o600);
+      while (true) {
+        try { lock.exec("BEGIN IMMEDIATE"); break; } catch (error) {
+          if ((error as { code?: string }).code !== "SQLITE_BUSY") throw error;
+          if (Date.now() - start > LOCK_TIMEOUT_MS) throw new Error("Timed out waiting for Withings token lock.");
+          await sleep(LOCK_RETRY_MS);
+        }
+      }
       return await fn();
     } finally {
-      await handle.close().catch(() => undefined);
-      await fs.unlink(this.lockPath).catch(() => undefined);
+      lock.close();
     }
   }
 }

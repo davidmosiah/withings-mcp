@@ -316,3 +316,15 @@ vascular age) and unknown types retain their numeric data without a guessed
 unit; raw JSON remains unchanged. Markdown previews display decoded scale values
 and units instead of the generic activity fields. Measurement type units follow
 the [official API reference](https://developer.withings.com/api-reference/#operation/measure-getmeas).
+
+### Token rotation and API failures
+
+Token records retain the Withings `userid`. Refreshes serialize across processes
+using an OS-held SQLite lock (the existing SQLite dependency), which releases
+automatically after a process crash. New credentials are flushed and atomically
+replaced before use. Both HTTP 401 and JSON statuses 401/343 trigger one refresh;
+concurrent rejected requests reuse a rotation that already completed. Incomplete
+token responses or a changed user identity leave saved credentials intact.
+
+API failures are returned as failures even with the optional SQLite cache enabled;
+a previous successful response must not conceal revoked access or stale readings.

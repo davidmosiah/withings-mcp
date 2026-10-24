@@ -142,7 +142,12 @@ export class WithingsClient {
       body: new URLSearchParams(stringifyParams(cleanBody)).toString()
     });
 
-    if (response.status === 401) {
+    let rejected = response.status === 401;
+    if (!rejected && response.ok) {
+      const payload = await response.clone().json().catch(() => null);
+      rejected = isObject(payload) && (payload.status === 401 || payload.status === 343);
+    }
+    if (rejected) {
       const refreshed = await this.refreshToken(true, token);
       const retry = await this.fetchWithRetry(url, {
         method: "POST",
@@ -187,8 +192,9 @@ export class WithingsClient {
       if (normalizeUserId(refreshed.userid) !== originalUser) {
         throw new Error("Withings refresh account identity changed or is unavailable. Re-authorize before retrying.");
       }
-      await this.tokenStore.write({ ...current, ...refreshed });
-      return { ...current, ...refreshed };
+      const next = { ...current, ...refreshed, scope: refreshed.scope ?? current.scope };
+      await this.tokenStore.write(next);
+      return next;
     });
   }
 
@@ -209,6 +215,11 @@ export class WithingsClient {
     const data = await this.parseResponse(response) as Record<string, unknown>;
     const tokenBody = isObject(data.body) ? data.body : data;
     const expiresIn = typeof tokenBody.expires_in === "number" ? tokenBody.expires_in : undefined;
+    if (typeof tokenBody.access_token !== "string" || !tokenBody.access_token ||
+        typeof tokenBody.refresh_token !== "string" || !tokenBody.refresh_token ||
+        !expiresIn || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new Error("Withings token response was incomplete; saved credentials were preserved.");
+    }
     return {
       userid: normalizeUserId(tokenBody.userid),
       access_token: String(tokenBody.access_token ?? ""),
