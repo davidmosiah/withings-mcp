@@ -162,6 +162,7 @@ function demoBodyMeasures() {
       }
     ],
     next_page: 2,
+    next_offset: 2,
     has_more: true,
     pages_fetched: 1,
     empty: false

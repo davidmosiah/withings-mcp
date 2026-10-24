@@ -333,3 +333,11 @@ already completed. Incomplete token responses or a changed user identity leave
 saved credentials intact. Signed token requests are never replayed automatically.
 
 Authenticated API failures remain errors, including transient failures; no earlier response is substituted.
+
+### Exact list continuation
+
+Collection tools accept `offset` and return `next_offset` when more rows remain.
+Pass that value back with the same filters; it takes precedence over the legacy
+`page` estimate. Withings can return numeric `more: 1`, short pages, and offsets
+that differ from the requested page size. `all_pages` follows these offsets up to
+`max_pages`; a response with `has_more: true` is a partial export.
