@@ -17,11 +17,13 @@ let refreshes = 0;
 let reject = false;
 let user = 101;
 let incomplete = false;
+let transient = false;
 globalThis.fetch = async (_url, init) => {
   const form = new URLSearchParams(init.body);
   if (form.get('action') === 'getnonce') return Response.json({ status: 0, body: { nonce: 'synthetic-nonce' } });
   if (form.get('action') === 'requesttoken') {
     refreshes++;
+    if (transient) return new Response('synthetic transient token error', { status: 503 });
     return Response.json({ status: 0, body: incomplete ? {} : { access_token: 'synthetic-new',
       refresh_token: 'synthetic-rotated', userid: user, expires_in: 10800, scope: 'user.metrics' } });
   }
@@ -45,6 +47,14 @@ try {
   await assert.rejects(new WithingsClient(config).get('/measure'), /incomplete/);
   assert.deepEqual(JSON.parse(await readFile(tokenPath, 'utf8')), initial);
   incomplete = false;
+
+  // Signed token requests must not blindly replay a consumed nonce or code.
+  transient = true;
+  const priorRefreshes = refreshes;
+  await assert.rejects(new WithingsClient(config).get('/measure'), /HTTP 503/);
+  assert.equal(refreshes, priorRefreshes + 1);
+  assert.deepEqual(JSON.parse(await readFile(tokenPath, 'utf8')), initial);
+  transient = false;
 
   // Cache-enabled requests must surface a revoked authorization, not prior data.
   const cached = new WithingsClient({ ...config, cacheEnabled: true });
