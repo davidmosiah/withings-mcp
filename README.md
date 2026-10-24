@@ -291,3 +291,15 @@ npx -y withings-mcp-unofficial call withings_connection_status --json '{}'
 ```
 
 Copy `skill/SKILL.md` into your agent skills dir.
+
+### Token rotation and API failures
+
+Token records retain the Withings `userid`. Refreshes serialize across processes
+using an OS-held SQLite lock (the existing SQLite dependency), which releases
+automatically after a process crash. New credentials are flushed and atomically
+replaced before use. Both HTTP 401 and JSON statuses 401/343 trigger one refresh;
+concurrent rejected requests reuse a rotation that already completed. Incomplete
+token responses or a changed user identity leave saved credentials intact.
+
+API failures are returned as failures even with the optional SQLite cache enabled;
+a previous successful response must not conceal revoked access or stale readings.

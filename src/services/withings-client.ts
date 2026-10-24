@@ -131,8 +131,13 @@ export class WithingsClient {
       body: new URLSearchParams(stringifyParams(cleanBody)).toString()
     });
 
-    if (response.status === 401) {
-      const refreshed = await this.refreshToken(true);
+    let rejected = response.status === 401;
+    if (!rejected && response.ok) {
+      const payload = await response.clone().json().catch(() => null);
+      rejected = isObject(payload) && (payload.status === 401 || payload.status === 343);
+    }
+    if (rejected) {
+      const refreshed = await this.refreshToken(true, token.access_token);
       const retry = await this.fetchWithRetry(url, {
         method: "POST",
         headers: this.formHeaders(refreshed.access_token),
@@ -159,17 +164,23 @@ export class WithingsClient {
     return shouldRefresh ? this.refreshToken(false) : tokens;
   }
 
-  private async refreshToken(force: boolean): Promise<WithingsTokenSet> {
+  private async refreshToken(force: boolean, rejectedToken?: string): Promise<WithingsTokenSet> {
     return this.tokenStore.withLock(async () => {
       const current = await this.tokenStore.read();
       if (!current?.refresh_token) {
         throw new Error("Withings refresh token not found. Re-authorize with withings-mcp-server auth.");
       }
+      // Another caller may already have rotated the token while we waited.
+      if (force && rejectedToken && current.access_token !== rejectedToken) return current;
       if (!force && current.expires_at && current.expires_at - Math.floor(Date.now() / 1000) >= 3600) return current;
 
       const refreshed = await this.requestTokens({ grant_type: "refresh_token", refresh_token: current.refresh_token });
-      await this.tokenStore.write({ ...current, ...refreshed });
-      return { ...current, ...refreshed };
+      if (current.userid && refreshed.userid && current.userid !== refreshed.userid) {
+        throw new Error("Withings refresh returned a different user; saved credentials were preserved.");
+      }
+      const next = { ...current, ...refreshed, userid: refreshed.userid ?? current.userid, scope: refreshed.scope ?? current.scope };
+      await this.tokenStore.write(next);
+      return next;
     });
   }
 
@@ -190,7 +201,13 @@ export class WithingsClient {
     const data = await this.parseResponse(response) as Record<string, unknown>;
     const tokenBody = isObject(data.body) ? data.body : data;
     const expiresIn = typeof tokenBody.expires_in === "number" ? tokenBody.expires_in : undefined;
+    if (typeof tokenBody.access_token !== "string" || !tokenBody.access_token ||
+        typeof tokenBody.refresh_token !== "string" || !tokenBody.refresh_token ||
+        !expiresIn || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new Error("Withings token response was incomplete; saved credentials were preserved.");
+    }
     return {
+      userid: typeof tokenBody.userid === "number" || typeof tokenBody.userid === "string" ? String(tokenBody.userid) : undefined,
       access_token: String(tokenBody.access_token ?? ""),
       refresh_token: typeof tokenBody.refresh_token === "string" ? tokenBody.refresh_token : undefined,
       token_type: typeof tokenBody.token_type === "string" ? tokenBody.token_type : undefined,
@@ -259,17 +276,11 @@ export class WithingsClient {
 
   private async parseAndCache(method: "POST", url: string, response: Response, body: Record<string, string | number | boolean>): Promise<unknown> {
     const cacheKey = `${url} ${JSON.stringify(body)}`;
-    try {
-      const payload = await this.parseResponse(response);
-      if (this.config.cacheEnabled) this.getCache().set(method, cacheKey, payload);
-      return payload;
-    } catch (error) {
-      if (this.config.cacheEnabled) {
-        const cached = this.getCache().get(method, cacheKey);
-        if (cached !== undefined) return cached;
-      }
-      throw error;
-    }
+    // API failures must stay failures: a cached success must not conceal a
+    // revoked authorization or report old measurements as a fresh response.
+    const payload = await this.parseResponse(response);
+    if (this.config.cacheEnabled) this.getCache().set(method, cacheKey, payload);
+    return payload;
   }
 
   private getCache(): WithingsCache {
