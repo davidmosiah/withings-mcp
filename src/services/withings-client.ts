@@ -197,7 +197,7 @@ export class WithingsClient {
       method: "POST",
       headers: this.publicFormHeaders(),
       body: new URLSearchParams(stringifyParams(signed)).toString()
-    });
+    }, true);
     const data = await this.parseResponse(response) as Record<string, unknown>;
     const tokenBody = isObject(data.body) ? data.body : data;
     const expiresIn = typeof tokenBody.expires_in === "number" ? tokenBody.expires_in : undefined;
@@ -288,8 +288,10 @@ export class WithingsClient {
     return this.cache;
   }
 
-  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {});
+  private async fetchWithRetry(url: string, init: RequestInit, noRetry = false): Promise<Response> {
+    // A signed token request contains a single-use nonce and authorization code
+    // or rotating refresh credential. Never blindly replay that same payload.
+    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {}, noRetry ? { noRetry: true } : {});
     return fetchWithCache(url, init, {
       defaultTtlSeconds: 60,
       envVarBypass: "WITHINGS_NO_CACHE",

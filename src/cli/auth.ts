@@ -28,7 +28,7 @@ export async function runAuthCommand(args: string[]): Promise<number> {
   const json = args.includes("--json");
   const config = getConfig();
   const redirect = parseLocalRedirectUri(config.redirectUri);
-  const state = randomBytes(4).toString("hex");
+  const state = randomBytes(32).toString("hex");
   const client = new WithingsClient(config);
   const authUrl = client.authUrl(state);
   const timeoutMs = Number(process.env.WITHINGS_AUTH_TIMEOUT_MS ?? 300_000);
@@ -48,7 +48,7 @@ export async function runAuthCommand(args: string[]): Promise<number> {
       console.log("  1. Approve access in the browser tab that opens.");
       console.log("  2. Withings will redirect to the local callback.");
       console.log("  3. Tokens are saved locally; this command never prints them.");
-      console.log("  4. Don't pause — Withings auth codes expire in minutes.");
+      console.log("  4. Don't pause — Withings auth codes expire in 30 seconds.");
       console.log("");
       console.log("Waiting for callback...");
     }
