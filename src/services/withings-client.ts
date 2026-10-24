@@ -24,7 +24,7 @@ export class WithingsClient {
   private cache?: WithingsCache;
 
   constructor(private readonly config: WithingsConfig) {
-    this.tokenStore = new TokenStore(config.tokenPath);
+    this.tokenStore = new TokenStore(config.tokenPath, config.tokenEncryptionKey);
   }
 
   authUrl(state?: string, scopes?: string[]): string {

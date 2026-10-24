@@ -17,6 +17,7 @@ export interface WithingsConfig {
   redirectUri: string;
   scopes: string[];
   tokenPath: string;
+  tokenEncryptionKey?: string;
   privacyMode: PrivacyMode;
   cacheEnabled: boolean;
   cachePath: string;

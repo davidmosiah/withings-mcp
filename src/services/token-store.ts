@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 import { dirname } from "node:path";
 import type { WithingsTokenSet } from "../types.js";
+import { decodeTokens, encodeTokens, tokenKey } from "./token-codec.js";
 
 const LOCK_RETRY_MS = 250;
 const LOCK_TIMEOUT_MS = 15_000;
@@ -12,7 +13,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 export class TokenStore {
-  constructor(private readonly tokenPath: string) {}
+  private readonly key?: Buffer;
+  constructor(private readonly tokenPath: string, encryptionKey?: string) { this.key = tokenKey(encryptionKey); }
 
   private get lockPath(): string {
     return `${this.tokenPath}.lock.sqlite`;
@@ -21,7 +23,7 @@ export class TokenStore {
   async read(): Promise<WithingsTokenSet | null> {
     try {
       const text = await fs.readFile(this.tokenPath, "utf8");
-      return JSON.parse(text) as WithingsTokenSet;
+      return decodeTokens(text, this.key);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
@@ -34,7 +36,7 @@ export class TokenStore {
     try {
       const handle = await fs.open(tmp, "wx", 0o600);
       try {
-        await handle.writeFile(JSON.stringify(tokens, null, 2));
+        await handle.writeFile(encodeTokens(tokens, this.key));
         await handle.sync();
       } finally { await handle.close(); }
       await fs.rename(tmp, this.tokenPath);

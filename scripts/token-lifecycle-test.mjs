@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { WithingsClient } from '../dist/services/withings-client.js';
 import { TokenStore } from '../dist/services/token-store.js';
+import { buildConnectionStatus } from '../dist/services/connection-status.js';
 
 const home = await mkdtemp(join(tmpdir(), 'withings-tokens-'));
 const tokenPath = join(home, 'tokens.json');
@@ -20,6 +21,7 @@ let incomplete = false;
 let transient = false;
 let oldTokenResponse = () => Response.json({ status: 401, body: {} });
 let dataFailure;
+let encryptionKey;
 globalThis.fetch = async (_url, init) => {
   const form = new URLSearchParams(init.body);
   if (form.get('action') === 'getnonce') return Response.json({ status: 0, body: { nonce: 'synthetic-nonce' } });
@@ -32,7 +34,7 @@ globalThis.fetch = async (_url, init) => {
   if (dataFailure) return dataFailure();
   if (reject) return Response.json({ status: 401, body: {} });
   if (init.headers.Authorization === 'Bearer synthetic-old') return oldTokenResponse();
-  const saved = JSON.parse(await readFile(tokenPath, 'utf8'));
+  const saved = await new TokenStore(tokenPath, encryptionKey).read();
   assert.equal(saved.refresh_token, 'synthetic-rotated', 'rotation persisted before first new-token use');
   return Response.json({ status: 0, body: { measuregrps: [] } });
 };
@@ -136,6 +138,32 @@ try {
     const start = Date.now(); await new TokenStore(tokenPath).withLock(async () => {});
     assert.ok(Date.now() - start < 2000, 'kernel lock released on process death');
   } finally { child.kill('SIGKILL'); }
+
+  // The same real refresh path must persist only authenticated ciphertext.
+  encryptionKey = Buffer.alloc(32, 42).toString('base64url');
+  const encrypted = new TokenStore(tokenPath, encryptionKey);
+  await encrypted.write(initial);
+  const firstCiphertext = await readFile(tokenPath, 'utf8');
+  assert.ok(!firstCiphertext.includes(initial.access_token) && !firstCiphertext.includes(initial.refresh_token));
+  assert.ok(!firstCiphertext.includes('access_token') && !firstCiphertext.includes(encryptionKey));
+  await encrypted.write(initial);
+  assert.notEqual(await readFile(tokenPath, 'utf8'), firstCiphertext, 'fresh nonce on every write');
+  await new WithingsClient({ ...config, tokenEncryptionKey: encryptionKey }).get('/measure');
+  assert.equal((await encrypted.read()).refresh_token, 'synthetic-rotated');
+  const status = await buildConnectionStatus({ homeDir: home, env: {
+    WITHINGS_TOKEN_PATH: tokenPath, WITHINGS_TOKEN_ENCRYPTION_KEY: encryptionKey } });
+  assert.equal(status.token.readable, true);
+  assert.ok(!JSON.stringify(status).includes(encryptionKey));
+  await assert.rejects(new TokenStore(tokenPath).read(), /Cannot read Withings token store/);
+  await assert.rejects(new TokenStore(tokenPath, Buffer.alloc(32, 43).toString('base64url')).read(), /Cannot read Withings token store/);
+  assert.throws(() => new TokenStore(tokenPath, 'invalid-secret-key'), /32 bytes encoded/);
+  const envelope = JSON.parse(await readFile(tokenPath, 'utf8'));
+  const corrupt = Buffer.from(envelope.ciphertext, 'base64url'); corrupt[0] ^= 1;
+  await writeFile(tokenPath, JSON.stringify({ ...envelope, ciphertext: corrupt.toString('base64url') }));
+  await assert.rejects(encrypted.read(), /Cannot read Withings token store/);
+  await writeFile(tokenPath, JSON.stringify(initial));
+  await assert.rejects(encrypted.read(), /Cannot read Withings token store/);
   console.log(JSON.stringify({ ok: true, json_auth_refresh: true, concurrent_rotation: true,
-    preserve_identity: true, invalid_token_statuses: true, transient_cache_fallback: true, lock_exclusion: true, reject_incomplete_tokens: true, no_stale_success: true, crash_recovery: true }));
+    preserve_identity: true, invalid_token_statuses: true, transient_cache_fallback: true, lock_exclusion: true, reject_incomplete_tokens: true, no_stale_success: true, crash_recovery: true,
+    encrypted_at_rest: true, reject_tampering: true, no_plaintext_fallback: true }));
 } finally { globalThis.fetch = original; await rm(home, { recursive: true, force: true }); }
