@@ -128,8 +128,6 @@ function demoWellnessContext(generatedAt: string) {
  */
 function demoBodyMeasures() {
   return {
-    source: "withings",
-    fetched_at: new Date().toISOString(),
     endpoint: "/measure",
     privacy_mode: "structured",
     count: 2,

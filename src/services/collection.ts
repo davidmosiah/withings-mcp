@@ -19,8 +19,6 @@ export function buildCollectionOutput(endpoint: string, privacyMode: PrivacyMode
   const count = records.records.length;
   const empty = count === 0;
   return {
-    source: "withings" as const,
-    fetched_at: new Date().toISOString(),
     endpoint,
     privacy_mode: privacyMode,
     count,
