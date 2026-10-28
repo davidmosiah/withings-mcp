@@ -112,8 +112,21 @@ try {
     if (retryEnv === undefined) delete process.env.WITHINGS_NO_RETRY; else process.env.WITHINGS_NO_RETRY = retryEnv;
   }
 
-  // A process killed inside the critical section leaves no orphan lock.
+  // Another process holding the lock excludes us until it releases.
   const moduleUrl = new URL('../dist/services/token-store.js', import.meta.url).href;
+  const holder = spawn(process.execPath, ['--input-type=module', '-e',
+    `import { TokenStore } from ${JSON.stringify(moduleUrl)}; await new TokenStore(process.argv[1]).withLock(async () => { process.stdout.write('locked;'); await new Promise((r) => setTimeout(r, 1000)); process.stdout.write('releasing;'); });`, tokenPath],
+    { stdio: ['ignore', 'pipe', 'pipe'] });
+  try {
+    let output = '';
+    holder.stdout.on('data', (chunk) => { output += chunk; });
+    await Promise.race([once(holder.stdout, 'data'), once(holder, 'exit').then(() => { throw new Error('lock holder exited early'); })]);
+    await new TokenStore(tokenPath).withLock(async () => {
+      assert.match(output, /releasing;/, 'lock excluded a second process while held');
+    });
+  } finally { holder.kill('SIGKILL'); }
+
+  // A process killed inside the critical section leaves no orphan lock.
   const child = spawn(process.execPath, ['--input-type=module', '-e',
     `import { TokenStore } from ${JSON.stringify(moduleUrl)}; await new TokenStore(process.argv[1]).withLock(async () => { process.stdout.write('locked'); await new Promise(() => { setInterval(() => {}, 1000); }); });`, tokenPath],
     { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -124,5 +137,5 @@ try {
     assert.ok(Date.now() - start < 2000, 'kernel lock released on process death');
   } finally { child.kill('SIGKILL'); }
   console.log(JSON.stringify({ ok: true, json_auth_refresh: true, concurrent_rotation: true,
-    preserve_identity: true, invalid_token_statuses: true, transient_cache_fallback: true, reject_incomplete_tokens: true, no_stale_success: true, crash_recovery: true }));
+    preserve_identity: true, invalid_token_statuses: true, transient_cache_fallback: true, lock_exclusion: true, reject_incomplete_tokens: true, no_stale_success: true, crash_recovery: true }));
 } finally { globalThis.fetch = original; await rm(home, { recursive: true, force: true }); }
