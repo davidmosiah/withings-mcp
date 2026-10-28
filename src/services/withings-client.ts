@@ -77,7 +77,7 @@ export class WithingsClient {
     return { ...this.getCache().status(), http_cache };
   }
 
-  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number }> {
+  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number; cached?: boolean; cached_at?: string }> {
     const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_WITHINGS_LIMIT);
     const maxPages = params.all_pages ? Math.max(1, params.max_pages ?? 1) : 1;
     const maxRecords = limit * maxPages;
@@ -85,9 +85,12 @@ export class WithingsClient {
     let offset = Math.max(((params.page ?? 1) - 1) * limit, 0);
     let pages = 0;
     let hasMore = false;
+    let cachedAt: string | undefined;
 
     while (pages < maxPages) {
       const payload = await this.get(path, buildListRequestParams(params, offset, limit));
+      if (isObject(payload) && payload.cached === true && typeof payload.cached_at === "string" &&
+          (!cachedAt || payload.cached_at < cachedAt)) cachedAt = payload.cached_at;
       const pageRecords = extractRecords(payload);
       const remaining = maxRecords - records.length;
       records.push(...pageRecords.slice(0, remaining));
@@ -98,7 +101,8 @@ export class WithingsClient {
       offset += limit;
     }
 
-    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, pages_fetched: pages };
+    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, pages_fetched: pages,
+      ...(cachedAt ? { cached: true, cached_at: cachedAt } : {}) };
   }
 
   private extractCode(input: string): string {
@@ -125,28 +129,27 @@ export class WithingsClient {
     const token = await this.getValidToken();
     const cleanBody = cleanParams(body);
     const url = this.buildUrl(path);
-    const response = await this.fetchWithRetry(url, {
-      method: "POST",
-      headers: this.formHeaders(token.access_token),
-      body: new URLSearchParams(stringifyParams(cleanBody)).toString()
-    });
-
-    let rejected = response.status === 401;
-    if (!rejected && response.ok) {
-      const payload = await response.clone().json().catch(() => null);
-      rejected = isObject(payload) && (payload.status === 401 || payload.status === 343);
-    }
-    if (rejected) {
+    const cacheKey = `${url} ${JSON.stringify(cleanBody)}`;
+    let response = await this.send(url, token.access_token, cleanBody, cacheKey);
+    if (response instanceof Response && await isRejectedToken(response)) {
       const refreshed = await this.refreshToken(true, token.access_token);
-      const retry = await this.fetchWithRetry(url, {
-        method: "POST",
-        headers: this.formHeaders(refreshed.access_token),
-        body: new URLSearchParams(stringifyParams(cleanBody)).toString()
-      });
-      return this.parseAndCache("POST", url, retry, cleanBody);
+      response = await this.send(url, refreshed.access_token, cleanBody, cacheKey);
     }
+    if (!(response instanceof Response)) return response;
+    return this.parseAndCache("POST", url, response, cacheKey);
+  }
 
-    return this.parseAndCache("POST", url, response, cleanBody);
+  private async send(url: string, accessToken: string, body: WithingsActionParams, cacheKey: string): Promise<Response | unknown> {
+    try {
+      return await this.fetchWithRetry(url, {
+        method: "POST",
+        headers: this.formHeaders(accessToken),
+        body: new URLSearchParams(stringifyParams(body)).toString()
+      });
+    } catch (error) {
+      // A network failure is transient: a marked earlier response may stand in.
+      return this.cachedFallback(cacheKey, error);
+    }
   }
 
   private buildUrl(path: string): string {
@@ -266,21 +269,33 @@ export class WithingsClient {
     const payload = text ? safeJson(text) : null;
     if (!response.ok) {
       const details = payload && typeof payload === "object" ? JSON.stringify(payload) : text;
-      throw new Error(`Withings API HTTP ${response.status}: ${redactErrorMessage(details || response.statusText)}`);
+      throw withTransient(new Error(`Withings API HTTP ${response.status}: ${redactErrorMessage(details || response.statusText)}`), response.status >= 500);
     }
     if (isObject(payload) && typeof payload.status === "number" && payload.status !== 0) {
-      throw new Error(`Withings API status ${payload.status}: ${redactErrorMessage(JSON.stringify(payload))}`);
+      throw withTransient(new Error(`Withings API status ${payload.status}: ${redactErrorMessage(JSON.stringify(payload))}`), payload.status === RATE_LIMITED_STATUS);
     }
     return payload ?? {};
   }
 
-  private async parseAndCache(method: "POST", url: string, response: Response, body: Record<string, string | number | boolean>): Promise<unknown> {
-    const cacheKey = `${url} ${JSON.stringify(body)}`;
-    // API failures must stay failures: a cached success must not conceal a
-    // revoked authorization or report old measurements as a fresh response.
-    const payload = await this.parseResponse(response);
+  private async parseAndCache(method: "POST", url: string, response: Response, cacheKey: string): Promise<unknown> {
+    let payload: unknown;
+    try {
+      payload = await this.parseResponse(response);
+    } catch (error) {
+      if (!(error as { transient?: boolean }).transient) throw error;
+      return this.cachedFallback(cacheKey, error);
+    }
     if (this.config.cacheEnabled) this.getCache().set(method, cacheKey, payload);
     return payload;
+  }
+
+  // Only transient failures (network, HTTP 5xx, rate limit) may fall back to an
+  // earlier response, marked as cached. Authorization and parameter errors stay
+  // errors so a cached success cannot conceal revoked access.
+  private cachedFallback(cacheKey: string, error: unknown): unknown {
+    const entry = this.config.cacheEnabled ? this.getCache().entry("POST", cacheKey) : undefined;
+    if (!entry || !isObject(entry.payload)) throw error;
+    return { ...entry.payload, cached: true, cached_at: entry.cached_at };
   }
 
   private getCache(): WithingsCache {
@@ -409,6 +424,22 @@ function cleanParams(input: WithingsActionParams): Record<string, string | numbe
 
 function stringifyParams(input: Record<string, string | number | boolean | undefined>): Record<string, string> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]));
+}
+
+// Withings reports an invalid or expired access token as HTTP 401 or JSON
+// status 100, 101, 102, 200 or 401. Other statuses are not token failures.
+const REJECTED_TOKEN_STATUSES = new Set([100, 101, 102, 200, 401]);
+const RATE_LIMITED_STATUS = 601;
+
+async function isRejectedToken(response: Response): Promise<boolean> {
+  if (response.status === 401) return true;
+  if (!response.ok) return false;
+  const payload = await response.clone().json().catch(() => null);
+  return isObject(payload) && typeof payload.status === "number" && REJECTED_TOKEN_STATUSES.has(payload.status);
+}
+
+function withTransient(error: Error, transient: boolean): Error {
+  return transient ? Object.assign(error, { transient: true }) : error;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

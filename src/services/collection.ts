@@ -5,6 +5,8 @@ export interface CollectionListResult {
   records: unknown[];
   next_page?: number;
   pages_fetched: number;
+  cached?: boolean;
+  cached_at?: string;
 }
 
 /**
@@ -26,6 +28,9 @@ export function buildCollectionOutput(endpoint: string, privacyMode: PrivacyMode
     next_page: result.next_page,
     has_more: Boolean(result.next_page),
     pages_fetched: result.pages_fetched,
+    /** Present when a transient failure was answered from the local cache. */
+    cached: result.cached,
+    cached_at: result.cached_at,
     /** True when the export/list returned zero rows — not a success that "has data". */
     empty,
     /** Agent-facing warning when empty; undefined when rows exist. */

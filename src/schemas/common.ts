@@ -116,6 +116,8 @@ export const CollectionOutputSchema = z.object({
   next_page: z.number().int().positive().optional(),
   has_more: z.boolean(),
   pages_fetched: z.number().int().nonnegative(),
+  cached: z.boolean().optional(),
+  cached_at: z.string().optional(),
   empty: z.boolean().optional(),
   warning: z.string().optional()
 }).strict();

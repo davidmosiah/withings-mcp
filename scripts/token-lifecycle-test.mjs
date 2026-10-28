@@ -18,6 +18,8 @@ let reject = false;
 let user = 101;
 let incomplete = false;
 let transient = false;
+let oldTokenResponse = () => Response.json({ status: 401, body: {} });
+let dataFailure;
 globalThis.fetch = async (_url, init) => {
   const form = new URLSearchParams(init.body);
   if (form.get('action') === 'getnonce') return Response.json({ status: 0, body: { nonce: 'synthetic-nonce' } });
@@ -27,7 +29,9 @@ globalThis.fetch = async (_url, init) => {
     return Response.json({ status: 0, body: incomplete ? {} : { access_token: 'synthetic-new',
       refresh_token: 'synthetic-rotated', userid: user, expires_in: 10800, scope: 'user.metrics' } });
   }
-  if (reject || init.headers.Authorization === 'Bearer synthetic-old') return Response.json({ status: 343, body: {} });
+  if (dataFailure) return dataFailure();
+  if (reject) return Response.json({ status: 401, body: {} });
+  if (init.headers.Authorization === 'Bearer synthetic-old') return oldTokenResponse();
   const saved = JSON.parse(await readFile(tokenPath, 'utf8'));
   assert.equal(saved.refresh_token, 'synthetic-rotated', 'rotation persisted before first new-token use');
   return Response.json({ status: 0, body: { measuregrps: [] } });
@@ -56,11 +60,57 @@ try {
   assert.deepEqual(JSON.parse(await readFile(tokenPath, 'utf8')), initial);
   transient = false;
 
+  // Only Withings' invalid-token answers refresh: HTTP 401 and JSON 100-102, 200, 401.
+  for (const answer of [() => new Response('', { status: 401 }),
+    ...[100, 101, 102, 200, 401].map((status) => () => Response.json({ status, body: {} }))]) {
+    await writeFile(tokenPath, JSON.stringify(initial)); oldTokenResponse = answer;
+    const before = refreshes;
+    await new WithingsClient(config).get('/measure');
+    assert.equal(refreshes, before + 1);
+  }
+  // JSON 343 is a notification-callback error, not an expired token.
+  await writeFile(tokenPath, JSON.stringify(initial)); oldTokenResponse = () => Response.json({ status: 343, body: {} });
+  const beforeCallbackError = refreshes;
+  await assert.rejects(new WithingsClient(config).get('/measure'), /status 343/);
+  assert.equal(refreshes, beforeCallbackError);
+  assert.deepEqual(JSON.parse(await readFile(tokenPath, 'utf8')), initial);
+  oldTokenResponse = () => Response.json({ status: 401, body: {} });
+
   // Cache-enabled requests must surface a revoked authorization, not prior data.
   const cached = new WithingsClient({ ...config, cacheEnabled: true });
-  await cached.get('/measure'); reject = true;
-  await assert.rejects(cached.get('/measure'), /status 343/);
+  const fresh = await cached.get('/measure');
+  await cached.list('/measure', { action: 'getmeas' }); reject = true;
+  assert.equal(fresh.cached, undefined);
+  await assert.rejects(cached.get('/measure'), /status 401/);
   reject = false;
+  // Parameter and other non-transient statuses also stay errors.
+  for (const answer of [() => Response.json({ status: 503, body: {} }), () => Response.json({ status: 2555, body: {} }),
+    () => new Response('bad request', { status: 400 })]) {
+    dataFailure = answer;
+    await assert.rejects(cached.get('/measure'), /Withings API/);
+  }
+  // Transient failures (network, HTTP 5xx, rate limit) return the earlier response, marked.
+  const retryEnv = process.env.WITHINGS_NO_RETRY;
+  process.env.WITHINGS_NO_RETRY = '1';
+  try {
+    for (const answer of [() => { throw new TypeError('fetch failed'); }, () => new Response('unavailable', { status: 503 }),
+      () => Response.json({ status: 601, body: {} })]) {
+      dataFailure = answer;
+      const stale = await cached.get('/measure');
+      assert.equal(stale.cached, true);
+      assert.match(stale.cached_at, /^\d{4}-\d{2}-\d{2}T/);
+      assert.deepEqual(stale.body, { measuregrps: [] });
+      const listed = await cached.list('/measure', { action: 'getmeas' });
+      assert.equal(listed.cached, true);
+      assert.match(listed.cached_at, /^\d{4}-\d{2}-\d{2}T/);
+    }
+    // Without an earlier response the transient failure itself is reported.
+    dataFailure = () => new Response('unavailable', { status: 503 });
+    await assert.rejects(new WithingsClient(config).get('/measure'), /HTTP 503/);
+  } finally {
+    dataFailure = undefined;
+    if (retryEnv === undefined) delete process.env.WITHINGS_NO_RETRY; else process.env.WITHINGS_NO_RETRY = retryEnv;
+  }
 
   // A process killed inside the critical section leaves no orphan lock.
   const moduleUrl = new URL('../dist/services/token-store.js', import.meta.url).href;
@@ -74,5 +124,5 @@ try {
     assert.ok(Date.now() - start < 2000, 'kernel lock released on process death');
   } finally { child.kill('SIGKILL'); }
   console.log(JSON.stringify({ ok: true, json_auth_refresh: true, concurrent_rotation: true,
-    preserve_identity: true, reject_incomplete_tokens: true, no_stale_success: true, crash_recovery: true }));
+    preserve_identity: true, invalid_token_statuses: true, transient_cache_fallback: true, reject_incomplete_tokens: true, no_stale_success: true, crash_recovery: true }));
 } finally { globalThis.fetch = original; await rm(home, { recursive: true, force: true }); }
