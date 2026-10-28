@@ -294,9 +294,13 @@ Copy `skill/SKILL.md` into your agent skills dir.
 
 ### Request deadlines
 
-Each HTTP operation has a ten-second total deadline, including retries and
-response-body reads. Disabling retries does not disable the deadline. A
-`Retry-After` longer than the remaining budget returns the API failure immediately
-instead of sleeping indefinitely or retrying earlier than the provider permits.
-Retry logs contain status codes or a generic network-failure category, never
-arbitrary exception messages that can contain credentials or health data.
+Each HTTP operation has a total deadline, including retries and response-body
+reads: `WITHINGS_HTTP_TIMEOUT_MS` (default 10000). Disabling retries does not
+disable the deadline. A `Retry-After` longer than the remaining budget returns
+the API failure immediately instead of sleeping indefinitely or retrying earlier
+than the provider permits; a network error whose backoff would pass the deadline
+is reported as that network error. The token lock wait covers a refresh (two
+bounded calls): twice the deadline plus five seconds. Retry logs contain status
+codes or a known network error code such as `ECONNRESET` (otherwise
+`network_failure`), never arbitrary exception messages that can contain
+credentials or health data.
