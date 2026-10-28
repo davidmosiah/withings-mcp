@@ -109,8 +109,6 @@ export const EndpointDataOutputSchema = z.object({
 }).strict();
 
 export const CollectionOutputSchema = z.object({
-  source: z.literal("withings"),
-  fetched_at: z.string().describe("UTC ISO 8601 time when this collection was fetched; distinct from each measurement's date."),
   endpoint: z.string(),
   privacy_mode: PrivacyModeValueSchema,
   count: z.number().int().nonnegative(),

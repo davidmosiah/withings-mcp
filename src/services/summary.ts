@@ -1,4 +1,5 @@
 import type { WithingsClient } from "./withings-client.js";
+import { decodeMeasure } from "./measures.js";
 import { redactErrorMessage } from "./redaction.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -136,9 +137,8 @@ function normalizePercent(value?: number): number | undefined {
 function extractWeightKg(group: UnknownRecord): number | undefined {
   const measures = Array.isArray(group.measures) ? group.measures as UnknownRecord[] : [];
   const weight = measures.find((measure) => num(measure, ["type"]) === 1);
-  const value = weight ? num(weight, ["value"]) : undefined;
-  const unit = weight ? num(weight, ["unit"]) : undefined;
-  return value === undefined || unit === undefined ? undefined : round(value * (10 ** unit), 2);
+  const decoded = weight ? (decodeMeasure(weight) as UnknownRecord).decoded_value : undefined;
+  return typeof decoded === "number" ? round(decoded, 2) : undefined;
 }
 
 function classifyReadiness(stats: ReturnType<typeof dailyStats>): string {
