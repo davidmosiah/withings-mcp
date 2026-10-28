@@ -322,9 +322,9 @@ the [official API reference](https://developer.withings.com/api-reference/#opera
 Token records retain the Withings `userid`. Refreshes serialize across processes
 using an OS-held SQLite lock (the existing SQLite dependency), which releases
 automatically after a process crash. New credentials are flushed and atomically
-replaced before use. Both HTTP 401 and JSON statuses 401/343 trigger one refresh;
-concurrent rejected requests reuse a rotation that already completed. Incomplete
-token responses or a changed user identity leave saved credentials intact.
+replaced before use. HTTP 401 and the JSON invalid-token statuses 100, 101, 102,
+200 and 401 trigger one refresh; concurrent rejected requests reuse a rotation that
+already completed. Incomplete token responses or a changed user identity leave
+saved credentials intact. Signed token requests are never replayed automatically.
 
-API failures are returned as failures even with the optional SQLite cache enabled;
-a previous successful response must not conceal revoked access or stale readings.
+Authenticated API failures remain errors, including transient failures; no earlier response is substituted.

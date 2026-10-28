@@ -142,12 +142,7 @@ export class WithingsClient {
       body: new URLSearchParams(stringifyParams(cleanBody)).toString()
     });
 
-    let rejected = response.status === 401;
-    if (!rejected && response.ok) {
-      const payload = await response.clone().json().catch(() => null);
-      rejected = isObject(payload) && (payload.status === 401 || payload.status === 343);
-    }
-    if (rejected) {
+    if (await isRejectedToken(response)) {
       const refreshed = await this.refreshToken(true, token);
       const retry = await this.fetchWithRetry(url, {
         method: "POST",
@@ -409,6 +404,17 @@ function cleanParams(input: WithingsActionParams): Record<string, string | numbe
 
 function stringifyParams(input: Record<string, string | number | boolean | undefined>): Record<string, string> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]));
+}
+
+// Withings reports an invalid or expired access token as HTTP 401 or JSON
+// status 100, 101, 102, 200 or 401. Other statuses are not token failures.
+const REJECTED_TOKEN_STATUSES = new Set([100, 101, 102, 200, 401]);
+
+async function isRejectedToken(response: Response): Promise<boolean> {
+  if (response.status === 401) return true;
+  if (!response.ok) return false;
+  const payload = await response.clone().json().catch(() => null);
+  return isObject(payload) && typeof payload.status === "number" && REJECTED_TOKEN_STATUSES.has(payload.status);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
