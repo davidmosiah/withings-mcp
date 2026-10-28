@@ -49,6 +49,16 @@ export class WithingsCache {
     }
   }
 
+  entry(method: string, url: string): { payload: unknown; cached_at: string } | undefined {
+    const row = this.db.prepare("SELECT payload, cached_at FROM api_cache WHERE cache_key = ?").get(cacheKey(method, url)) as { payload?: string; cached_at: string } | undefined;
+    if (!row?.payload) return undefined;
+    try {
+      return { payload: JSON.parse(row.payload), cached_at: row.cached_at };
+    } catch {
+      return undefined;
+    }
+  }
+
   set(method: string, url: string, payload: unknown): void {
     this.db.prepare(`
       INSERT INTO api_cache (cache_key, method, url, payload, cached_at)

@@ -297,9 +297,12 @@ Copy `skill/SKILL.md` into your agent skills dir.
 Token records retain the Withings `userid`. Refreshes serialize across processes
 using an OS-held SQLite lock (the existing SQLite dependency), which releases
 automatically after a process crash. New credentials are flushed and atomically
-replaced before use. Both HTTP 401 and JSON statuses 401/343 trigger one refresh;
-concurrent rejected requests reuse a rotation that already completed. Incomplete
-token responses or a changed user identity leave saved credentials intact.
+replaced before use. HTTP 401 and the JSON invalid-token statuses 100, 101, 102,
+200 and 401 trigger one refresh; concurrent rejected requests reuse a rotation that
+already completed. Incomplete token responses or a changed user identity leave
+saved credentials intact. Signed token requests are never replayed automatically.
 
-API failures are returned as failures even with the optional SQLite cache enabled;
-a previous successful response must not conceal revoked access or stale readings.
+With the optional SQLite cache enabled, only transient failures (network errors,
+HTTP 5xx and JSON status 601) return the previous successful response, marked
+`cached: true` with its `cached_at` time. Authorization and parameter errors remain
+errors, so a previous response cannot conceal revoked access.
