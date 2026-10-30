@@ -319,3 +319,5 @@ Wrong/missing keys, modified ciphertext, and plaintext files when encryption is
 enabled fail explicitly. Enable encryption before connecting, or reauthorize an
 existing plaintext connection. Protect and back up the key; losing it requires
 reauthorization. The legacy plaintext format remains available when unset.
+An empty `WITHINGS_TOKEN_ENCRYPTION_KEY=""` is invalid and throws a configuration
+error; unset the variable to disable encryption for plaintext token files.
