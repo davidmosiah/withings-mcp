@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Fixed
+
+- `withings_list_body_measures` now requests real measurements (`category=1`); user goals (category 2) are no longer included in its results.
+
 ### Security
 
 - Raise stale npm override pins so Dependabot security updates can succeed: `qs@6.16.0`, `hono@4.13.7`, `fast-uri@3.1.8`, `ip-address@10.7.1`. No new dependencies.
