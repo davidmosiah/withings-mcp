@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,11 +22,12 @@ for (const rel of ["README.md", "llms.txt", "examples/claude-desktop.json", "exa
 const binCandidates = [join(root, "dist/index.js"), join(root, "src/index.js")];
 const bin = binCandidates.find((p) => existsSync(p));
 assert.ok(bin, "built or source entry missing");
+const home = mkdtempSync(join(tmpdir(), "withings-skill-test-"));
 
 function run(args) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [bin, ...args], {
-      env: { ...process.env },
+      env: { PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home },
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "";
@@ -41,12 +43,16 @@ function run(args) {
   });
 }
 
-const result = await run(["call", "withings_connection_status", "--json", "{}"]);
-assert.equal(result.code === 0 || result.code === 1, true, result.stderr);
-assert.ok(result.stdout.trim().startsWith("{") || result.stdout.trim().startsWith("["), result.stdout + result.stderr);
-JSON.parse(result.stdout);
+try {
+  const result = await run(["call", "withings_connection_status", "--json", "{}"]);
+  assert.equal(result.code === 0 || result.code === 1, true, result.stderr);
+  assert.ok(result.stdout.trim().startsWith("{") || result.stdout.trim().startsWith("["), result.stdout + result.stderr);
+  JSON.parse(result.stdout);
 
-const unknown = await run(["call", "not_a_real_tool_name"]);
-assert.equal(unknown.code, 1);
+  const unknown = await run(["call", "not_a_real_tool_name"]);
+  assert.equal(unknown.code, 1);
 
-console.log(JSON.stringify({ ok: true, suite: "skill-surface", tool: "withings_connection_status", files: pkg.files }, null, 2));
+  console.log(JSON.stringify({ ok: true, suite: "skill-surface", tool: "withings_connection_status", files: pkg.files }, null, 2));
+} finally {
+  rmSync(home, { recursive: true, force: true });
+}

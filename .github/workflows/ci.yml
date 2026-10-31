@@ -20,10 +20,21 @@ jobs:
       matrix:
         node-version: [22]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
-      - run: npm ci
-      - run: npm test
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - name: Build the reviewed SQLite native dependency
+        run: |
+          node_root="$(dirname "$(dirname "$(command -v node)")")"
+          node_gyp="$(npm root -g)/npm/node_modules/node-gyp/bin/node-gyp.js"
+          cd node_modules/better-sqlite3
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP" USERPROFILE="$RUNNER_TEMP" node "$node_gyp" rebuild --release --nodedir="$node_root"
+      - name: Test with a clean environment
+        run: |
+          mkdir -p "$RUNNER_TEMP/withings-test-home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/withings-test-home" USERPROFILE="$RUNNER_TEMP/withings-test-home" npm test
