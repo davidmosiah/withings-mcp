@@ -26,6 +26,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
       - run: npm ci --ignore-scripts
       - name: Build the reviewed SQLite native dependency
         run: |
