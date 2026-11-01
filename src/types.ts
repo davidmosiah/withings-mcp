@@ -24,6 +24,8 @@ export interface WithingsConfig {
 export interface WithingsCollection<T = unknown> {
   records?: T[];
   next_page?: number;
+  next_offset?: number;
+  next_cursor?: string;
 }
 
 export interface ToolResponse<T> extends Record<string, unknown> {

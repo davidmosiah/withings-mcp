@@ -160,6 +160,8 @@ function demoBodyMeasures() {
       }
     ],
     next_page: 2,
+    next_offset: 2,
+    next_cursor: Buffer.from(JSON.stringify({ offset: 2, skip: 0, fingerprint: "synthetic-query" })).toString("base64url"),
     has_more: true,
     pages_fetched: 1,
     empty: false
