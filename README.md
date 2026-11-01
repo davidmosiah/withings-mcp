@@ -291,3 +291,15 @@ npx -y withings-mcp-unofficial call withings_connection_status --json '{}'
 ```
 
 Copy `skill/SKILL.md` into your agent skills dir.
+
+### Body-measure values and timestamps
+
+`withings_list_body_measures` requests real measurements (`category=1`), not
+user goals. Structured and summary body-measure groups include `measured_at`
+(UTC ISO 8601) and decoded measures: `decoded_value = value * 10 ** unit`, with
+documented `label` and `unit_label` for known types. Original value, exponent,
+type and future fields remain intact. Types without a documented unit (such as
+vascular age) and unknown types retain their numeric data without a guessed
+unit; raw JSON remains unchanged. Markdown previews display decoded scale values
+and units instead of the generic activity fields. Measurement type units follow
+the [official API reference](https://developer.withings.com/api-reference/#operation/measure-getmeas).
