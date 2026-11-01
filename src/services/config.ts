@@ -40,6 +40,8 @@ export function getConfig(): WithingsConfig {
     redirectUri: redirectUri!,
     scopes,
     tokenPath,
+    // Keep this key outside the token volume and local config file.
+    tokenEncryptionKey: process.env.WITHINGS_TOKEN_ENCRYPTION_KEY,
     privacyMode,
     cacheEnabled,
     cachePath

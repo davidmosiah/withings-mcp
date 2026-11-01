@@ -5,6 +5,7 @@ import { DEFAULT_SCOPES, WITHINGS_DEVELOPER_PORTAL_URL, PINNED_NPM_PACKAGE } fro
 import type { PrivacyMode, WithingsTokenSet } from "../types.js";
 import { HERMES_DIRECT_TOOLS, type AgentClientName } from "./agent-manifest.js";
 import { loadConfigSources } from "./local-config.js";
+import { decodeTokens, tokenKey } from "./token-codec.js";
 
 type Env = Record<string, string | undefined>;
 
@@ -92,7 +93,7 @@ export async function buildConnectionStatus(options: ConnectionStatusOptions = {
   const redirectUri = value("WITHINGS_REDIRECT_URI");
   const requiredEnv = Object.fromEntries(REQUIRED_ENV.map((name) => [name, Boolean(value(name as keyof typeof sources.values))]));
   const missingEnv = REQUIRED_ENV.filter((name) => !requiredEnv[name]);
-  const token = await inspectToken(tokenPath, nowSeconds);
+  const token = await inspectToken(tokenPath, nowSeconds, env.WITHINGS_TOKEN_ENCRYPTION_KEY);
   const oauth = buildOAuthScopeStatus(token);
   const nodeSupported = Number(process.versions.node.split(".")[0] ?? 0) >= 20;
   const automaticAuthSupported = Boolean(redirectUri && isLocalHttpRedirect(redirectUri));
@@ -150,12 +151,12 @@ function isLocalHttpRedirect(value: string): boolean {
   }
 }
 
-async function inspectToken(path: string, nowSeconds: number): Promise<ConnectionStatus["token"]> {
+async function inspectToken(path: string, nowSeconds: number, encryptionKey?: string): Promise<ConnectionStatus["token"]> {
   try {
     const [stat, text] = await Promise.all([fs.stat(path), fs.readFile(path, "utf8")]);
     const permissions = (stat.mode & 0o777).toString(8).padStart(3, "0");
     const securePermissions = process.platform === "win32" ? true : (stat.mode & 0o077) === 0;
-    const token = JSON.parse(text) as Partial<WithingsTokenSet>;
+    const token = decodeTokens(text, tokenKey(encryptionKey)) as Partial<WithingsTokenSet>;
     const expiresAt = typeof token.expires_at === "number" ? token.expires_at : undefined;
     return {
       path,

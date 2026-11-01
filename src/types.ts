@@ -2,6 +2,7 @@ export type ResponseFormat = "markdown" | "json";
 export type PrivacyMode = "summary" | "structured" | "raw";
 
 export interface WithingsTokenSet {
+  userid?: string;
   access_token: string;
   refresh_token?: string;
   expires_at?: number;
@@ -16,6 +17,7 @@ export interface WithingsConfig {
   redirectUri: string;
   scopes: string[];
   tokenPath: string;
+  tokenEncryptionKey?: string;
   privacyMode: PrivacyMode;
   cacheEnabled: boolean;
   cachePath: string;
