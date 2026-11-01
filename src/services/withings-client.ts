@@ -77,7 +77,7 @@ export class WithingsClient {
     return { ...this.getCache().status(), http_cache };
   }
 
-  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number }> {
+  async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number; cached?: boolean; cached_at?: string }> {
     const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_WITHINGS_LIMIT);
     const maxPages = params.all_pages ? Math.max(1, params.max_pages ?? 1) : 1;
     const maxRecords = limit * maxPages;
@@ -85,9 +85,12 @@ export class WithingsClient {
     let offset = Math.max(((params.page ?? 1) - 1) * limit, 0);
     let pages = 0;
     let hasMore = false;
+    let cachedAt: string | undefined;
 
     while (pages < maxPages) {
       const payload = await this.get(path, buildListRequestParams(params, offset, limit));
+      if (isObject(payload) && payload.cached === true && typeof payload.cached_at === "string" &&
+          (!cachedAt || payload.cached_at < cachedAt)) cachedAt = payload.cached_at;
       const pageRecords = extractRecords(payload);
       const remaining = maxRecords - records.length;
       records.push(...pageRecords.slice(0, remaining));
@@ -98,7 +101,8 @@ export class WithingsClient {
       offset += limit;
     }
 
-    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, pages_fetched: pages };
+    return { records, next_page: hasMore ? (params.page ?? 1) + pages : undefined, pages_fetched: pages,
+      ...(cachedAt ? { cached: true, cached_at: cachedAt } : {}) };
   }
 
   private extractCode(input: string): string {
@@ -125,23 +129,27 @@ export class WithingsClient {
     const token = await this.getValidToken();
     const cleanBody = cleanParams(body);
     const url = this.buildUrl(path);
-    const response = await this.fetchWithRetry(url, {
-      method: "POST",
-      headers: this.formHeaders(token.access_token),
-      body: new URLSearchParams(stringifyParams(cleanBody)).toString()
-    });
-
-    if (response.status === 401) {
-      const refreshed = await this.refreshToken(true);
-      const retry = await this.fetchWithRetry(url, {
-        method: "POST",
-        headers: this.formHeaders(refreshed.access_token),
-        body: new URLSearchParams(stringifyParams(cleanBody)).toString()
-      });
-      return this.parseAndCache("POST", url, retry, cleanBody);
+    const cacheKey = `${url} ${JSON.stringify(cleanBody)}`;
+    let response = await this.send(url, token.access_token, cleanBody, cacheKey);
+    if (response instanceof Response && await isRejectedToken(response)) {
+      const refreshed = await this.refreshToken(true, token.access_token);
+      response = await this.send(url, refreshed.access_token, cleanBody, cacheKey);
     }
+    if (!(response instanceof Response)) return response;
+    return this.parseAndCache("POST", url, response, cacheKey);
+  }
 
-    return this.parseAndCache("POST", url, response, cleanBody);
+  private async send(url: string, accessToken: string, body: WithingsActionParams, cacheKey: string): Promise<Response | unknown> {
+    try {
+      return await this.fetchWithRetry(url, {
+        method: "POST",
+        headers: this.formHeaders(accessToken),
+        body: new URLSearchParams(stringifyParams(body)).toString()
+      });
+    } catch (error) {
+      // A network failure is transient: a marked earlier response may stand in.
+      return this.cachedFallback(cacheKey, error);
+    }
   }
 
   private buildUrl(path: string): string {
@@ -159,17 +167,23 @@ export class WithingsClient {
     return shouldRefresh ? this.refreshToken(false) : tokens;
   }
 
-  private async refreshToken(force: boolean): Promise<WithingsTokenSet> {
+  private async refreshToken(force: boolean, rejectedToken?: string): Promise<WithingsTokenSet> {
     return this.tokenStore.withLock(async () => {
       const current = await this.tokenStore.read();
       if (!current?.refresh_token) {
         throw new Error("Withings refresh token not found. Re-authorize with withings-mcp-server auth.");
       }
+      // Another caller may already have rotated the token while we waited.
+      if (force && rejectedToken && current.access_token !== rejectedToken) return current;
       if (!force && current.expires_at && current.expires_at - Math.floor(Date.now() / 1000) >= 3600) return current;
 
       const refreshed = await this.requestTokens({ grant_type: "refresh_token", refresh_token: current.refresh_token });
-      await this.tokenStore.write({ ...current, ...refreshed });
-      return { ...current, ...refreshed };
+      if (current.userid && refreshed.userid && current.userid !== refreshed.userid) {
+        throw new Error("Withings refresh returned a different user; saved credentials were preserved.");
+      }
+      const next = { ...current, ...refreshed, userid: refreshed.userid ?? current.userid, scope: refreshed.scope ?? current.scope };
+      await this.tokenStore.write(next);
+      return next;
     });
   }
 
@@ -186,11 +200,17 @@ export class WithingsClient {
       method: "POST",
       headers: this.publicFormHeaders(),
       body: new URLSearchParams(stringifyParams(signed)).toString()
-    });
+    }, true);
     const data = await this.parseResponse(response) as Record<string, unknown>;
     const tokenBody = isObject(data.body) ? data.body : data;
     const expiresIn = typeof tokenBody.expires_in === "number" ? tokenBody.expires_in : undefined;
+    if (typeof tokenBody.access_token !== "string" || !tokenBody.access_token ||
+        typeof tokenBody.refresh_token !== "string" || !tokenBody.refresh_token ||
+        !expiresIn || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new Error("Withings token response was incomplete; saved credentials were preserved.");
+    }
     return {
+      userid: typeof tokenBody.userid === "number" || typeof tokenBody.userid === "string" ? String(tokenBody.userid) : undefined,
       access_token: String(tokenBody.access_token ?? ""),
       refresh_token: typeof tokenBody.refresh_token === "string" ? tokenBody.refresh_token : undefined,
       token_type: typeof tokenBody.token_type === "string" ? tokenBody.token_type : undefined,
@@ -249,27 +269,33 @@ export class WithingsClient {
     const payload = text ? safeJson(text) : null;
     if (!response.ok) {
       const details = payload && typeof payload === "object" ? JSON.stringify(payload) : text;
-      throw new Error(`Withings API HTTP ${response.status}: ${redactErrorMessage(details || response.statusText)}`);
+      throw withTransient(new Error(`Withings API HTTP ${response.status}: ${redactErrorMessage(details || response.statusText)}`), response.status >= 500);
     }
     if (isObject(payload) && typeof payload.status === "number" && payload.status !== 0) {
-      throw new Error(`Withings API status ${payload.status}: ${redactErrorMessage(JSON.stringify(payload))}`);
+      throw withTransient(new Error(`Withings API status ${payload.status}: ${redactErrorMessage(JSON.stringify(payload))}`), payload.status === RATE_LIMITED_STATUS);
     }
     return payload ?? {};
   }
 
-  private async parseAndCache(method: "POST", url: string, response: Response, body: Record<string, string | number | boolean>): Promise<unknown> {
-    const cacheKey = `${url} ${JSON.stringify(body)}`;
+  private async parseAndCache(method: "POST", url: string, response: Response, cacheKey: string): Promise<unknown> {
+    let payload: unknown;
     try {
-      const payload = await this.parseResponse(response);
-      if (this.config.cacheEnabled) this.getCache().set(method, cacheKey, payload);
-      return payload;
+      payload = await this.parseResponse(response);
     } catch (error) {
-      if (this.config.cacheEnabled) {
-        const cached = this.getCache().get(method, cacheKey);
-        if (cached !== undefined) return cached;
-      }
-      throw error;
+      if (!(error as { transient?: boolean }).transient) throw error;
+      return this.cachedFallback(cacheKey, error);
     }
+    if (this.config.cacheEnabled) this.getCache().set(method, cacheKey, payload);
+    return payload;
+  }
+
+  // Only transient failures (network, HTTP 5xx, rate limit) may fall back to an
+  // earlier response, marked as cached. Authorization and parameter errors stay
+  // errors so a cached success cannot conceal revoked access.
+  private cachedFallback(cacheKey: string, error: unknown): unknown {
+    const entry = this.config.cacheEnabled ? this.getCache().entry("POST", cacheKey) : undefined;
+    if (!entry || !isObject(entry.payload)) throw error;
+    return { ...entry.payload, cached: true, cached_at: entry.cached_at };
   }
 
   private getCache(): WithingsCache {
@@ -277,8 +303,10 @@ export class WithingsClient {
     return this.cache;
   }
 
-  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {});
+  private async fetchWithRetry(url: string, init: RequestInit, noRetry = false): Promise<Response> {
+    // A signed token request contains a single-use nonce and authorization code
+    // or rotating refresh credential. Never blindly replay that same payload.
+    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {}, noRetry ? { noRetry: true } : {});
     return fetchWithCache(url, init, {
       defaultTtlSeconds: 60,
       envVarBypass: "WITHINGS_NO_CACHE",
@@ -396,6 +424,22 @@ function cleanParams(input: WithingsActionParams): Record<string, string | numbe
 
 function stringifyParams(input: Record<string, string | number | boolean | undefined>): Record<string, string> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]));
+}
+
+// Withings reports an invalid or expired access token as HTTP 401 or JSON
+// status 100, 101, 102, 200 or 401. Other statuses are not token failures.
+const REJECTED_TOKEN_STATUSES = new Set([100, 101, 102, 200, 401]);
+const RATE_LIMITED_STATUS = 601;
+
+async function isRejectedToken(response: Response): Promise<boolean> {
+  if (response.status === 401) return true;
+  if (!response.ok) return false;
+  const payload = await response.clone().json().catch(() => null);
+  return isObject(payload) && typeof payload.status === "number" && REJECTED_TOKEN_STATUSES.has(payload.status);
+}
+
+function withTransient(error: Error, transient: boolean): Error {
+  return transient ? Object.assign(error, { transient: true }) : error;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
