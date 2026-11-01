@@ -1,9 +1,12 @@
 import { constants, promises as fs } from "node:fs";
 import { dirname } from "node:path";
 import type { WithingsTokenSet } from "../types.js";
+import { requestTimeoutMs } from "./http-retry.js";
 
 const LOCK_RETRY_MS = 250;
-const LOCK_TIMEOUT_MS = 15_000;
+// A refresh holds the lock for two bounded calls (nonce, then token); waiters
+// must outlast both rather than fail while a slow rotation still succeeds.
+const LOCK_TIMEOUT_MS = 2 * requestTimeoutMs() + 5_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -7,14 +7,24 @@
  * - Respects `Retry-After` header (seconds or HTTP-date).
  * - Logs every retry to stderr as `[withings-mcp] retry N/3 after Xms (status=Y or error=Z)`.
  * - Honors `WITHINGS_NO_RETRY=true` env var to disable (used in tests).
+ * - Bounds each operation by `WITHINGS_HTTP_TIMEOUT_MS` (default 10000).
  */
 export const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 export const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [500, 1000, 2000];
 const JITTER_FACTOR = 0.2;
 const LOG_PREFIX = "[withings-mcp]";
+const DEFAULT_TIMEOUT_MS = 10_000;
+// Error codes are fixed identifiers; exception messages can contain URLs or data.
+const LOGGED_ERROR_CODES = new Set([
+  "ECONNREFUSED", "ECONNRESET", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "EPIPE",
+  "EHOSTUNREACH", "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT", "UND_ERR_SOCKET", "UND_ERR_CLOSED"
+]);
 
 export interface RetryOptions {
+  /** Total request/retry deadline, including response-body reads. */
+  timeoutMs?: number;
   /** Override env-based disable flag (for tests). */
   noRetry?: boolean;
   /** Override sleep implementation (for tests). */
@@ -34,6 +44,17 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 function isNoRetryEnv(): boolean {
   const value = process.env.WITHINGS_NO_RETRY;
   return value === "true" || value === "1";
+}
+
+/** Total budget for one HTTP operation, including retries and body reads. */
+export function requestTimeoutMs(): number {
+  const value = Number(process.env.WITHINGS_HTTP_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
+}
+
+function errorCode(error: unknown): string {
+  const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
+  return typeof code === "string" && LOGGED_ERROR_CODES.has(code) ? code : "network_failure";
 }
 
 /**
@@ -72,15 +93,30 @@ export async function fetchWithRetry(
   const logger = options.logger ?? ((message: string) => process.stderr.write(`${message}\n`));
   const now = options.now ?? Date.now;
   const noRetry = options.noRetry ?? isNoRetryEnv();
+  const timeoutMs = options.timeoutMs ?? requestTimeoutMs();
+  const deadline = Date.now() + timeoutMs;
+  const deadlineSignal = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, deadlineSignal]) : deadlineSignal;
+  const boundedInit = { ...init, signal };
+  const wait = async (ms: number) => {
+    signal.throwIfAborted();
+    await new Promise<void>((resolve, reject) => {
+      const aborted = () => reject(signal.reason);
+      signal.addEventListener("abort", aborted, { once: true });
+      sleep(ms).then(resolve, reject).finally(() => signal.removeEventListener("abort", aborted));
+    });
+    signal.throwIfAborted();
+  };
 
   if (noRetry) {
-    return fetchImpl(url, init);
+    return fetchImpl(url, boundedInit);
   }
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetchImpl(url, init);
+      signal.throwIfAborted();
+      const response = await fetchImpl(url, boundedInit);
       if (!RETRYABLE_STATUSES.has(response.status)) {
         return response;
       }
@@ -89,17 +125,25 @@ export async function fetchWithRetry(
       }
       const retryAfterMs = parseRetryAfter(response.headers.get("retry-after"), now());
       const delay = retryAfterMs ?? computeBackoff(attempt, jitterRandom);
+      // Never retry earlier than Retry-After. Return the failure immediately if
+      // respecting it would exceed the total budget.
+      if (delay >= deadline - Date.now()) return response;
       logger(`${LOG_PREFIX} retry ${attempt + 1}/${MAX_ATTEMPTS} after ${delay}ms (status=${response.status})`);
-      await sleep(delay);
+      await response.body?.cancel();
+      await wait(delay);
     } catch (error) {
       lastError = error;
+      if (signal.aborted) throw signal.reason;
       if (attempt === MAX_ATTEMPTS - 1) {
         throw error;
       }
       const delay = computeBackoff(attempt, jitterRandom);
-      const message = error instanceof Error ? error.message : String(error);
-      logger(`${LOG_PREFIX} retry ${attempt + 1}/${MAX_ATTEMPTS} after ${delay}ms (error=${message})`);
-      await sleep(delay);
+      // If the budget ends before the next attempt, report the network failure
+      // itself rather than the deadline that merely ended the backoff wait.
+      if (delay >= deadline - Date.now()) throw error;
+      // Network errors can contain request URLs, credentials or provider data.
+      logger(`${LOG_PREFIX} retry ${attempt + 1}/${MAX_ATTEMPTS} after ${delay}ms (error=${errorCode(error)})`);
+      await wait(delay).catch((reason) => { throw deadlineSignal.aborted ? error : reason; });
     }
   }
 
