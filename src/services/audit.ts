@@ -10,10 +10,6 @@ function parsePrivacyMode(value: string | undefined): PrivacyMode {
   return "structured";
 }
 
-function parseBool(value: string | undefined): boolean {
-  return Boolean(value && ["1", "true", "yes", "on", "sqlite"].includes(value.toLowerCase()));
-}
-
 export function buildPrivacyAudit(): Record<string, unknown> {
   const requiredEnv = ["WITHINGS_CLIENT_ID", "WITHINGS_CLIENT_SECRET", "WITHINGS_REDIRECT_URI"];
   const sources = loadConfigSources();
@@ -28,7 +24,7 @@ export function buildPrivacyAudit(): Record<string, unknown> {
     privacy_mode_default: parsePrivacyMode(value("WITHINGS_PRIVACY_MODE")),
     raw_payloads_opt_in: true,
     gps_redaction_default: true,
-    cache_enabled: parseBool(value("WITHINGS_CACHE")),
+    cache_enabled: false,
     cache_path: value("WITHINGS_CACHE_PATH") ?? join(homedir(), ".withings-mcp", "cache.sqlite"),
     token_path: value("WITHINGS_TOKEN_PATH") ?? join(homedir(), ".withings-mcp", "tokens.json"),
     stdout_safe: true,
@@ -38,6 +34,7 @@ export function buildPrivacyAudit(): Record<string, unknown> {
     notes: [
       "This is an unofficial Withings integration.",
       "OAuth tokens are stored locally and are not returned by tools.",
+      "Authenticated responses bypass all caches; legacy SQLite rows are never read or updated.",
       "Raw Withings payloads require WITHINGS_PRIVACY_MODE=raw or privacy_mode=raw.",
       "Sensitive profile and token fields are removed or minimized unless raw mode is explicitly requested.",
       "stdio transport logs to stderr to avoid corrupting JSON-RPC."

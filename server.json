@@ -53,14 +53,14 @@
         },
         {
           "name": "WITHINGS_CACHE",
-          "description": "Optional SQLite cache toggle. Set to true or sqlite to enable.",
+          "description": "Legacy setting retained for compatibility. Authenticated response caching is disabled regardless of this value.",
           "isRequired": false,
           "format": "string",
           "isSecret": false
         },
         {
           "name": "WITHINGS_CACHE_PATH",
-          "description": "Optional local SQLite cache path. Defaults to ~/.withings-mcp/cache.sqlite.",
+          "description": "Legacy SQLite cache path for diagnostics only; authenticated requests do not open or modify it.",
           "isRequired": false,
           "format": "string",
           "isSecret": false

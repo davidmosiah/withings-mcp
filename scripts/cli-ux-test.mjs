@@ -38,7 +38,7 @@ try {
   assert.equal(ready.ok, true);
   assert.equal(ready.ready_for_withings_api, true);
   assert.equal(ready.privacy_mode, 'summary');
-  assert.equal(ready.cache.enabled, true);
+  assert.equal(ready.cache.enabled, false);
   assert.equal(ready.token.exists, true);
   assert.equal(ready.token.secure_permissions, true);
   assert.equal(ready.token.has_refresh_token, true);
