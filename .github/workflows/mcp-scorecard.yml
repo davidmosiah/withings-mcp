@@ -26,7 +26,23 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/withings-test-home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/withings-test-home" USERPROFILE="$RUNNER_TEMP/withings-test-home" npm test
-      - name: Run the scorecard with a clean environment
+      - name: Check out reviewed scorecard with JSON Schema dialect support
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: davidmosiah/mcp-scorecard
+          ref: e211c329379d52e47b0fafc0b54de7a6575617b3
+          path: .scorecard-tool
+          persist-credentials: false
+      - name: Build pinned scorecard without dependency lifecycle scripts
+        working-directory: .scorecard-tool
+        run: npm ci --ignore-scripts && npm run build
+      - name: Score and require no failed subchecks
+        shell: bash
         run: |
-          env -i PATH="$PATH" HOME="$RUNNER_TEMP/withings-test-home" USERPROFILE="$RUNNER_TEMP/withings-test-home" npm_config_ignore_scripts=true npx -y mcp-scorecard@0.5.4 . --min-score 90
-
+          report="$RUNNER_TEMP/mcp-scorecard-report.json"
+          probe_home="$(mktemp -d "$RUNNER_TEMP/scorecard-home.XXXXXX")"
+          status=0
+          env -i PATH="$PATH" HOME="$probe_home" USERPROFILE="$probe_home" node .scorecard-tool/dist/index.js . --json --min-score 90 > "$report" || status=$?
+          cat "$report"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          node scripts/check-scorecard-report.mjs "$report"
