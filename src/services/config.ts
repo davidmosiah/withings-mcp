@@ -19,7 +19,8 @@ export function getConfig(): WithingsConfig {
   const cachePath = value("WITHINGS_CACHE_PATH") ?? join(homedir(), ".withings-mcp", "cache.sqlite");
   const scopes = (value("WITHINGS_SCOPES")?.split(/[ ,]+/).filter(Boolean)) ?? DEFAULT_SCOPES;
   const privacyMode = parsePrivacyMode(value("WITHINGS_PRIVACY_MODE"));
-  const cacheEnabled = parseBool(value("WITHINGS_CACHE"), false);
+  // Retain the legacy configuration shape, never enable identity-blind response caching.
+  const cacheEnabled = false;
 
   const missing = [
     ["WITHINGS_CLIENT_ID", clientId],
@@ -51,7 +52,3 @@ function parsePrivacyMode(value: string | undefined): PrivacyMode {
   return "structured";
 }
 
-function parseBool(value: string | undefined, fallback: boolean): boolean {
-  if (!value) return fallback;
-  return ["1", "true", "yes", "on", "sqlite"].includes(value.toLowerCase());
-}

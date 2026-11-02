@@ -277,7 +277,7 @@ export function registerWithingsTools(server: McpServer): void {
 
   server.registerTool("withings_cache_status", {
     title: "Withings Cache Status",
-    description: "Show optional local SQLite cache status. Enable with WITHINGS_CACHE=sqlite or WITHINGS_CACHE=true.",
+    description: "Show cache status. Authenticated health response caching is disabled; legacy SQLite files are not read.",
     inputSchema: ResponseOnlyInputSchema.shape,
     outputSchema: CacheStatusOutputSchema.shape,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
@@ -409,9 +409,9 @@ export function registerWithingsTools(server: McpServer): void {
     {
       title: "Update Delx Wellness Profile",
       description:
-        "Persist a partial patch to ~/.delx-wellness/profile.json. Requires explicit_user_intent=true (otherwise returns USER_ACTION_REQUIRED). Rejects secret-like fields (oauth, token, secret, password, cookie, refresh, api_key, session) at write time. Use to record preferred name, goals, devices, training context, nutrition context, exercise preferences, agent preferences, and safety flags.",
+        "Persist a partial patch to ~/.delx-wellness/profile.json. Requires explicit_user_intent=true (otherwise returns USER_ACTION_REQUIRED). Validates known v1 fields, types and enums; rejects malformed stored profiles without overwriting them. Rejects secret-like fields (oauth, token, secret, password, cookie, refresh, api_key, session) at write time. Use to record preferred name, goals, devices, training context, nutrition context, exercise preferences, agent preferences, and safety flags.",
       inputSchema: {
-        patch: z.record(z.string(), z.unknown()).describe("Partial WellnessProfileDocument patch. Top-level keys: profile, goals, devices, training, nutrition, preferences, safety, notes."),
+        patch: z.record(z.string(), z.unknown()).describe("Partial WellnessProfileDocument patch. Only profile, goals, devices, training, nutrition, preferences, safety, notes are writable. Nested fields must match the v1 types and enums; null and unknown fields are rejected."),
         explicit_user_intent: z.boolean().optional().describe("Must be true to persist. Prevents accidental writes from agent inference."),
         response_format: z.enum(["markdown", "json"]).default("markdown")
       },

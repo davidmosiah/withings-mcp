@@ -195,7 +195,7 @@ WITHINGS_REDIRECT_URI=http://127.0.0.1:3000/callback
 # Optional
 WITHINGS_SCOPES="user.activity user.metrics"
 WITHINGS_PRIVACY_MODE=structured        # summary | structured | raw
-WITHINGS_CACHE=sqlite                   # optional read-through cache
+WITHINGS_CACHE=sqlite                   # legacy setting; authenticated caching is disabled
 WITHINGS_TOKEN_PATH=~/.withings-mcp/tokens.json
 WITHINGS_CACHE_PATH=~/.withings-mcp/cache.sqlite
 ```
@@ -291,3 +291,14 @@ npx -y withings-mcp-unofficial call withings_connection_status --json '{}'
 ```
 
 Copy `skill/SKILL.md` into your agent skills dir.
+
+### Authenticated response cache safety
+
+Authenticated health responses always reach the provider and are never cached or
+replaced by a previous success when the provider fails. This includes account
+changes, expired/revoked credentials and transient failures. `WITHINGS_CACHE` is
+retained for configuration compatibility, but cannot enable this unsafe fallback.
+Legacy SQLite files are not opened, read, changed or deleted by requests or cache
+status checks. They may still contain historical health data: remove them manually
+when no longer needed. Generic HTTP caching also bypasses Authorization,
+Proxy-Authorization and Cookie headers, case-insensitively.

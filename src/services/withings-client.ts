@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { URL, URLSearchParams } from "node:url";
 import { DEFAULT_LIMIT, MAX_WITHINGS_LIMIT, WITHINGS_API_BASE_URL, WITHINGS_AUTH_URL, WITHINGS_SIGNATURE_PATH, WITHINGS_TOKEN_PATH } from "../constants.js";
 import type { WithingsConfig, WithingsTokenSet } from "../types.js";
-import { disabledCacheStatus, type CacheStatus, WithingsCache } from "./cache.js";
+import { disabledCacheStatus, type CacheStatus } from "./cache.js";
 import { fetchWithCache, getCacheStats } from "./http-cache.js";
 import { fetchWithRetry } from "./http-retry.js";
 import { redactErrorMessage } from "./redaction.js";
@@ -21,7 +21,6 @@ type WithingsActionParams = Record<string, string | number | boolean | undefined
 
 export class WithingsClient {
   private readonly tokenStore: TokenStore;
-  private cache?: WithingsCache;
 
   constructor(private readonly config: WithingsConfig) {
     this.tokenStore = new TokenStore(config.tokenPath);
@@ -73,8 +72,9 @@ export class WithingsClient {
       default_ttl_seconds: 60,
       bypass_env_var: "WITHINGS_NO_CACHE"
     };
-    if (!this.config.cacheEnabled) return { ...disabledCacheStatus(this.config.cachePath), http_cache };
-    return { ...this.getCache().status(), http_cache };
+    // Authenticated health responses must never read or populate identity-blind caches.
+    // Do not even open legacy SQLite files: their rows have no verified account owner.
+    return { ...disabledCacheStatus(this.config.cachePath), http_cache };
   }
 
   async list(path: string, params: ListParams & WithingsActionParams = {}): Promise<{ records: unknown[]; next_page?: number; pages_fetched: number }> {
@@ -138,10 +138,10 @@ export class WithingsClient {
         headers: this.formHeaders(refreshed.access_token),
         body: new URLSearchParams(stringifyParams(cleanBody)).toString()
       });
-      return this.parseAndCache("POST", url, retry, cleanBody);
+      return this.parseResponse(retry);
     }
 
-    return this.parseAndCache("POST", url, response, cleanBody);
+    return this.parseResponse(response);
   }
 
   private buildUrl(path: string): string {
@@ -255,26 +255,6 @@ export class WithingsClient {
       throw new Error(`Withings API status ${payload.status}: ${redactErrorMessage(JSON.stringify(payload))}`);
     }
     return payload ?? {};
-  }
-
-  private async parseAndCache(method: "POST", url: string, response: Response, body: Record<string, string | number | boolean>): Promise<unknown> {
-    const cacheKey = `${url} ${JSON.stringify(body)}`;
-    try {
-      const payload = await this.parseResponse(response);
-      if (this.config.cacheEnabled) this.getCache().set(method, cacheKey, payload);
-      return payload;
-    } catch (error) {
-      if (this.config.cacheEnabled) {
-        const cached = this.getCache().get(method, cacheKey);
-        if (cached !== undefined) return cached;
-      }
-      throw error;
-    }
-  }
-
-  private getCache(): WithingsCache {
-    this.cache ??= new WithingsCache(this.config.cachePath);
-    return this.cache;
   }
 
   private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {

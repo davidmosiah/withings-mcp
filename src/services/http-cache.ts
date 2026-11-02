@@ -9,7 +9,8 @@
 //   1. process.env[envVarBypass] === "true"  (e.g. WITHINGS_NO_CACHE=true)
 //   2. init.cache_ttl === 0                  (per-call opt-out)
 //   3. Non-GET method                         (POST/PUT/DELETE never cached)
-//   4. Response status >= 400                 (don't cache errors)
+//   4. Authorization, Proxy-Authorization or Cookie header (all HeadersInit forms)
+//   5. Response status >= 400                 (don't cache errors)
 //
 // Note: Withings's wbsapi.withings.net only exposes POST endpoints, so this
 // middleware is effectively a no-op for the current call path. It exists so
@@ -51,7 +52,9 @@ export async function fetchWithCache(
   const method = (nativeInit.method ?? "GET").toUpperCase();
 
   const bypassEnv = options.envVarBypass ? process.env[options.envVarBypass] === "true" : false;
-  const bypass = bypassEnv || ttlSeconds === 0 || method !== "GET";
+  const headers = new Headers(nativeInit.headers);
+  const authenticated = ["authorization", "proxy-authorization", "cookie"].some((name) => headers.has(name));
+  const bypass = authenticated || bypassEnv || ttlSeconds === 0 || method !== "GET";
 
   if (!bypass) {
     const key = cacheKey(method, url);
