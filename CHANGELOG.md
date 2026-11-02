@@ -1,8 +1,11 @@
-## Unreleased
+## 0.6.0 - 2026-11-02
 
-### Security
+### Security and compatibility
 
-- Raise stale npm override pins so Dependabot security updates can succeed: `qs@6.16.0`, `hono@4.13.7`, `fast-uri@3.1.8`, `ip-address@10.7.1`. No new dependencies.
+- Release the main-branch hardening for authenticated-response cache isolation, local-only HTTP, profile validation, 256 KiB profile storage limits, cooperative writer locking and symlink rejection.
+- Bound tool input collections to 10,000 elements and reject compressed HTTP JSON bodies; preserve endpoint-specific limits.
+- Align package, lockfile, server manifest and runtime versions. Extend the existing CI matrix to Node.js 20/22/24 without changing workflow permissions.
+- These security restrictions can reject previously accepted configuration or input, so this is a pre-1.0 minor release. See [migration notes](docs/migration-0.6.0.md).
 
 ## 0.5.5 - 2026-10-03
 
