@@ -2,6 +2,8 @@
 
 ### Security
 
+- Pin multi-page list operations to one userid and reject account changes before requesting another page. Legacy profiles without userid must reauthorize before multi-page reads; single-page reads remain available.
+
 - Pin token refresh and HTTP 401 retries to the account identity captured before acquiring the token-store lock. A concurrent reauthorization cannot replay an existing request as another account.
 - Persist the OAuth `userid`. Refresh fails closed if the original, stored, or returned identity is missing or different. Existing profiles without `userid` must reauthorize before their next refresh; valid existing access tokens remain usable until then.
 

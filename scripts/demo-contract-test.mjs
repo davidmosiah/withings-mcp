@@ -106,7 +106,7 @@ const STUB_CONFIG = {
 /** Real `list()` over a stubbed transport, so paging fields come from real code. */
 async function realCollection({ more }) {
   const client = new WithingsClient(STUB_CONFIG);
-  client.get = async () => ({
+  client.request = async () => ({
     body: { measuregrps: [MEASUREGRP], more, offset: more ? 1 : 0 }
   });
   const result = await client.list('/measure', { action: 'getmeas', limit: 1 });

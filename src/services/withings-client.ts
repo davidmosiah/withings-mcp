@@ -81,13 +81,21 @@ export class WithingsClient {
     const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_WITHINGS_LIMIT);
     const maxPages = params.all_pages ? Math.max(1, params.max_pages ?? 1) : 1;
     const maxRecords = limit * maxPages;
+    // A multi-page operation must never combine records from different accounts.
+    // Legacy tokens without identity can still serve a single-page request.
+    const paginationUser = params.all_pages && maxPages > 1
+      ? normalizeUserId((await this.getValidToken()).userid)
+      : undefined;
+    if (params.all_pages && maxPages > 1 && !paginationUser) {
+      throw new Error("Withings account identity is unavailable for pagination. Re-authorize before retrying.");
+    }
     const records: unknown[] = [];
     let offset = Math.max(((params.page ?? 1) - 1) * limit, 0);
     let pages = 0;
     let hasMore = false;
 
     while (pages < maxPages) {
-      const payload = await this.get(path, buildListRequestParams(params, offset, limit));
+      const payload = await this.request(path, buildListRequestParams(params, offset, limit), paginationUser);
       const pageRecords = extractRecords(payload);
       const remaining = maxRecords - records.length;
       records.push(...pageRecords.slice(0, remaining));
@@ -121,8 +129,11 @@ export class WithingsClient {
     }
   }
 
-  private async request(path: string, body: WithingsActionParams = {}): Promise<unknown> {
+  private async request(path: string, body: WithingsActionParams = {}, expectedUser?: string): Promise<unknown> {
     const token = await this.getValidToken();
+    if (expectedUser && normalizeUserId(token.userid) !== expectedUser) {
+      throw new Error("Withings account identity changed during pagination. Re-authorize before retrying.");
+    }
     const cleanBody = cleanParams(body);
     const url = this.buildUrl(path);
     const response = await this.fetchWithRetry(url, {

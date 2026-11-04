@@ -76,4 +76,54 @@ for (const [identity,expected] of [[42,'42'],['42','42'],[undefined,undefined],[
  await client.exchangeCode('synthetic-code');
  assert.equal(written().userid,expected);
 }
+{
+ const {client}=setup(token('1'));
+ let current=token('1'), calls=0;
+ client.tokenStore.read=async()=>current;
+ client.fetchWithRetry=async()=>{
+  calls++;
+  current=token('2','synthetic-b');
+  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:true}});
+ };
+ await assert.rejects(client.list('/measure',{all_pages:true,max_pages:2,limit:1}),/identity changed during pagination/);
+ assert.equal(calls,1,'must not request a second page as B or return partial mixed results');
+}
+{
+ const {client}=setup(token('1'));
+ let calls=0;
+ client.fetchWithRetry=async()=>{
+  calls++;
+  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:calls===1}});
+ };
+ assert.equal((await client.list('/measure',{all_pages:true,max_pages:2,limit:1})).records.length,2);
+ assert.equal(calls,2);
+}
+{
+ const {client}=setup(token(undefined));
+ client.fetchWithRetry=async()=>{throw Error('must not fetch without pagination identity')};
+ await assert.rejects(client.list('/measure',{all_pages:true,max_pages:2,limit:1}),/identity is unavailable for pagination/);
+}
+{
+ const {client}=setup(token(undefined));
+ client.fetchWithRetry=async()=>Response.json({status:0,body:{measuregrps:[{synthetic:'legacy'}],more:false}});
+ assert.equal((await client.list('/measure',{limit:1})).records.length,1);
+}
+{
+ const {client}=setup(token('1'));
+ let reads=0;
+ client.tokenStore.read=async()=>token(++reads===1?'1':'2');
+ client.fetchWithRetry=async()=>{throw Error('must not fetch changed first-page identity')};
+ await assert.rejects(client.list('/measure',{all_pages:true,max_pages:2,limit:1}),/identity changed during pagination/);
+}
+{
+ const {client}=setup(token('1'));
+ let current=token('1'),calls=0;
+ client.tokenStore.read=async()=>current;
+ client.fetchWithRetry=async()=>{
+  calls++; current=token(undefined);
+  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:true}});
+ };
+ await assert.rejects(client.list('/measure',{all_pages:true,max_pages:2,limit:1}),/identity changed during pagination/);
+ assert.equal(calls,1);
+}
 console.log('PASS: token identity guards and HTTP 401 no-cross-account replay');
