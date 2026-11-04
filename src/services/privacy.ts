@@ -1,4 +1,5 @@
 import type { PrivacyMode, WithingsConfig } from "../types.js";
+import { decodeMeasure, measuredAt } from "./measures.js";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -86,9 +87,10 @@ function normalizeWithingsMeasureGroup(record: Record<string, unknown>, mode: Pr
   const base = pickDefined({
     grpid: record.grpid,
     date: record.date,
+    measured_at: measuredAt(record.date),
     category: record.category,
     attrib: record.attrib,
-    measures: record.measures
+    measures: Array.isArray(record.measures) ? record.measures.map(decodeMeasure) : record.measures
   });
   if (mode === "summary") return base;
   return removeSensitive({ ...record, ...base });

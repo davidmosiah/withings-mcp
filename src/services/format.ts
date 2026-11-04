@@ -1,5 +1,6 @@
 import type { ResponseFormat, ToolResponse } from "../types.js";
 import { redactErrorMessage, redactSensitive } from "./redaction.js";
+import { decodeMeasure, measuredAt } from "./measures.js";
 
 export function makeResponse<T>(data: T, format: ResponseFormat, markdown: string): ToolResponse<T> {
   const safeData = redactSensitive(data) as T;
@@ -41,10 +42,22 @@ export function formatCollection(title: string, records: unknown[], meta: Record
   for (const [index, record] of preview.entries()) {
     if (record && typeof record === "object") {
       const object = record as Record<string, unknown>;
-      const id = object.id ?? object.id_str ?? `item-${index + 1}`;
-      const start = object.start_date ?? object.start_date_local ?? object.created_at ?? object.updated_at ?? "n/a";
+      const id = object.id ?? object.id_str ?? object.grpid ?? `item-${index + 1}`;
+      const start = object.measured_at ?? measuredAt(object.date) ?? object.start_date ?? object.start_date_local ?? object.created_at ?? object.updated_at ?? "n/a";
       const sport = object.sport_type ?? object.type ?? "n/a";
       lines.push(`## ${String(id)}`);
+      if (Array.isArray(object.measures)) {
+        lines.push(`- **measured_at**: ${String(start)}`);
+        if (object.category !== undefined) lines.push(`- **category**: ${String(object.category)}`);
+        for (const raw of object.measures) {
+          const m = decodeMeasure(raw) as Record<string, unknown> | null;
+          if (m && typeof m === "object" && m.decoded_value !== undefined) {
+            lines.push(`- **${String(m.label ?? `type_${m.type}`)}**: ${String(m.decoded_value)}${m.unit_label ? ` ${m.unit_label}` : " (unit unknown)"}`);
+          }
+        }
+        lines.push("");
+        continue;
+      }
       if (object.name) lines.push(`- **name**: ${String(object.name)}`);
       lines.push(`- **start/created**: ${String(start)}`);
       lines.push(`- **sport/type**: ${String(sport)}`);
