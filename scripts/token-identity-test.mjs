@@ -30,11 +30,11 @@ for (const identity of ['2',undefined]) {
  assert.equal((await client.refreshToken(true,token('1'))).userid,'1');
  assert.equal(written().userid,'1');
 }
-{
+for (const rejected of [() => new Response('', {status:401}), () => Response.json({status:401,body:{}})]) {
  const {client}=setup(token('2','synthetic-b'));
  client.getValidToken=async()=>token('1');
  let calls=0;
- client.fetchWithRetry=async()=>{calls++;return {status:401}};
+ client.fetchWithRetry=async()=>{calls++;return rejected()};
  await assert.rejects(client.get('/measure'),/identity/);
  assert.equal(calls,1,'must not replay the request as another user');
 }
@@ -56,7 +56,7 @@ for (const identity of ['2',undefined]) {
  let calls=0;
  client.fetchWithRetry=async()=>{calls++;return new Response(JSON.stringify({status:401,body:{}}),{status:200})};
  await assert.rejects(client.get('/measure'),/Withings API status 401/);
- assert.equal(calls,1,'main JSON 401 must fail without retrying');
+ assert.equal(calls,2,'JSON 401 retries once with the same account, then fails');
 }
 {
  const {client}=setup(token('1'));

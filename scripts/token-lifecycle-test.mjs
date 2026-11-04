@@ -45,7 +45,7 @@ try {
 
   // Refresh must not replace the saved identity, even with a successful HTTP response.
   await writeFile(tokenPath, JSON.stringify(initial)); user = 202;
-  await assert.rejects(new WithingsClient(config).get('/measure'), /different user/);
+  await assert.rejects(new WithingsClient(config).get('/measure'), /identity/);
   assert.deepEqual(JSON.parse(await readFile(tokenPath, 'utf8')), initial);
   user = 101; incomplete = true;
   await assert.rejects(new WithingsClient(config).get('/measure'), /incomplete/);
