@@ -132,7 +132,7 @@ export class WithingsClient {
     });
 
     if (response.status === 401) {
-      const refreshed = await this.refreshToken(true);
+      const refreshed = await this.refreshToken(true, token);
       const retry = await this.fetchWithRetry(url, {
         method: "POST",
         headers: this.formHeaders(refreshed.access_token),
@@ -156,18 +156,26 @@ export class WithingsClient {
     }
     const expiresAt = tokens.expires_at ?? 0;
     const shouldRefresh = Boolean(tokens.refresh_token && expiresAt && expiresAt - Math.floor(Date.now() / 1000) < 3600);
-    return shouldRefresh ? this.refreshToken(false) : tokens;
+    return shouldRefresh ? this.refreshToken(false, tokens) : tokens;
   }
 
-  private async refreshToken(force: boolean): Promise<WithingsTokenSet> {
+  private async refreshToken(force: boolean, original: WithingsTokenSet): Promise<WithingsTokenSet> {
     return this.tokenStore.withLock(async () => {
       const current = await this.tokenStore.read();
       if (!current?.refresh_token) {
         throw new Error("Withings refresh token not found. Re-authorize with withings-mcp-server auth.");
       }
+      const originalUser = normalizeUserId(original.userid);
+      if (!originalUser || normalizeUserId(current.userid) !== originalUser) {
+        throw new Error("Withings account identity changed or is unavailable. Re-authorize before retrying.");
+      }
+      if (current.access_token !== original.access_token && current.expires_at && current.expires_at - Math.floor(Date.now() / 1000) >= 3600) return current;
       if (!force && current.expires_at && current.expires_at - Math.floor(Date.now() / 1000) >= 3600) return current;
 
       const refreshed = await this.requestTokens({ grant_type: "refresh_token", refresh_token: current.refresh_token });
+      if (normalizeUserId(refreshed.userid) !== originalUser) {
+        throw new Error("Withings refresh account identity changed or is unavailable. Re-authorize before retrying.");
+      }
       await this.tokenStore.write({ ...current, ...refreshed });
       return { ...current, ...refreshed };
     });
@@ -191,6 +199,7 @@ export class WithingsClient {
     const tokenBody = isObject(data.body) ? data.body : data;
     const expiresIn = typeof tokenBody.expires_in === "number" ? tokenBody.expires_in : undefined;
     return {
+      userid: normalizeUserId(tokenBody.userid),
       access_token: String(tokenBody.access_token ?? ""),
       refresh_token: typeof tokenBody.refresh_token === "string" ? tokenBody.refresh_token : undefined,
       token_type: typeof tokenBody.token_type === "string" ? tokenBody.token_type : undefined,
@@ -388,4 +397,10 @@ function safeJson(text: string): unknown {
   } catch {
     return text;
   }
+}
+
+function normalizeUserId(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return String(value);
+  if (typeof value === "string" && /^[1-9][0-9]*$/.test(value)) return value;
+  return undefined;
 }

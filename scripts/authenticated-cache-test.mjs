@@ -16,9 +16,9 @@ const originalFetch = globalThis.fetch;
 const oldNoRetry = process.env.WITHINGS_NO_RETRY;
 process.env.WITHINGS_NO_RETRY = 'true';
 const success = identity => Response.json({ status: 0, body: { measuregrps: [{ synthetic_identity: identity }] } });
-const token = identity => ({ access_token: identity, refresh_token: 'synthetic-refresh', expires_at: 4102444800 });
+const token = identity => ({ userid: identity === 'A' ? '1' : '2', access_token: identity, refresh_token: 'synthetic-refresh', expires_at: 4102444800 });
 let dataResponse = () => success('A');
-let tokenResponse = () => Response.json({ status: 0, body: { access_token: 'B-rotated', refresh_token: 'new-refresh', expires_in: 36000 } });
+let tokenResponse = () => Response.json({ status: 0, body: { userid: 2, access_token: 'B-rotated', refresh_token: 'new-refresh', expires_in: 36000 } });
 let calls = 0;
 globalThis.fetch = async (_url, init) => {
   calls++;
@@ -67,7 +67,7 @@ try {
   dataResponse = () => new Response('unauthorized', { status: 401 });
   await assert.rejects(client.get('/measure', { action: 'getmeas' }), /403/);
   // A successful refresh reaches the provider again rather than a cached account.
-  tokenResponse = () => Response.json({ status: 0, body: { access_token: 'B-rotated', refresh_token: 'new-refresh', expires_in: 36000 } });
+  tokenResponse = () => Response.json({ status: 0, body: { userid: 2, access_token: 'B-rotated', refresh_token: 'new-refresh', expires_in: 36000 } });
   await writeFile(config.tokenPath, JSON.stringify(token('B')));
   dataResponse = init => init.headers.Authorization === 'Bearer B-rotated' ? success('B') : new Response('', { status: 401 });
   assert.equal((await client.get('/measure', { action: 'getmeas' })).body.measuregrps[0].synthetic_identity, 'B');

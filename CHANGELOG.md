@@ -1,3 +1,10 @@
+## Unreleased
+
+### Security
+
+- Pin token refresh and HTTP 401 retries to the account identity captured before acquiring the token-store lock. A concurrent reauthorization cannot replay an existing request as another account.
+- Persist the OAuth `userid`. Refresh fails closed if the original, stored, or returned identity is missing or different. Existing profiles without `userid` must reauthorize before their next refresh; valid existing access tokens remain usable until then.
+
 ## 0.6.0 - 2026-11-02
 
 ### Security and compatibility
