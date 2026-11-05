@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.0 - 2026-11-05
 
 ### Security
 
@@ -6,14 +6,13 @@
 
 - Pin token refresh and HTTP 401 retries to the account identity captured before acquiring the token-store lock. A concurrent reauthorization cannot replay an existing request as another account.
 - Persist the OAuth `userid`. Refresh fails closed if the original, stored, or returned identity is missing or different. Existing profiles without `userid` must reauthorize before their next refresh; valid existing access tokens remain usable until then.
+- Serialize token rotation with an OS-held SQLite lock and persist token replacements atomically. Stop every client sharing a token file before upgrading or rolling back between lock implementations; see the coordinated transition in [migration notes](docs/migration-0.6.0.md).
 
 ### Fixed
 
 - `withings_list_body_measures` now requests real measurements (`category=1`); user goals (category 2) are no longer included in its results.
 
-## 0.6.0 - 2026-11-02
-
-### Security and compatibility
+### Additional security and compatibility changes
 
 - Release the main-branch hardening for authenticated-response cache isolation, local-only HTTP, profile validation, 256 KiB profile storage limits, cooperative writer locking and symlink rejection.
 - Bound tool input collections to 10,000 elements and reject compressed HTTP JSON bodies; preserve endpoint-specific limits.
