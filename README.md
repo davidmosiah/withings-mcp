@@ -333,3 +333,58 @@ already completed. Incomplete token responses or a changed user identity leave
 saved credentials intact. Signed token requests are never replayed automatically.
 
 Authenticated API failures remain errors, including transient failures; no earlier response is substituted.
+
+### Token encryption at rest
+
+Set the optional environment-only `WITHINGS_TOKEN_ENCRYPTION_KEY` to a secret
+32-byte key encoded as unpadded base64url to encrypt token files with AES-256-GCM.
+Keep the key in a secret manager outside the token volume. Files use the
+`withings-token-v1` JSON envelope: a 12-byte base64url `nonce` and base64url
+`ciphertext` with the 16-byte authentication tag appended; the format name is
+authenticated as additional data. Writes remain atomic and synchronized.
+Normal reads and refreshes fail explicitly for wrong/missing keys, modified
+ciphertext, or plaintext files when encryption is enabled. Explicit OAuth
+reauthorization instead replaces the token file under the lock using that
+process's configured key, or plaintext if the variable is unset; it does not
+need to decrypt the previous file. The lock serializes writes but does not enforce
+a shared encryption policy. All processes sharing a token file must use the same
+key, or all leave it unset. Protect and back up the key separately from tokens;
+losing it requires reauthorization. An empty `WITHINGS_TOKEN_ENCRYPTION_KEY=""`
+is invalid, not equivalent to an unset variable.
+
+For a new connection, configure encryption before authorizing. To enable
+encryption on an existing store, rotate the key, recover from a lost key, or
+deliberately return to plaintext, use this coordinated transition:
+
+The bundled Agent Plugin (`agent-plugin/mcp.json`) currently pins
+`withings-mcp-unofficial@0.5.5`, which lacks encryption support and uses the older
+`.lock` implementation. Do not run that pinned executable against a token file
+shared with this build; keep it stopped until its executable has been explicitly
+verified as compatible with the intended encryption mode and lock implementation.
+
+1. Stop **all** processes sharing the token file, including MCP clients, HTTP
+   helpers and scheduled jobs. Pause automatic restarts; do not run competing
+   authorization or refresh operations during the transition.
+2. While stopped, configure every client's environment with the same intended
+   key, or unset the variable everywhere only for a deliberate plaintext rollback.
+   Check that every configured executable supports the intended format and uses
+   the same lock implementation. If changing builds, also follow the
+   [token-lock upgrade and rollback procedure](docs/migration-0.6.0.md#token-lock-upgrades-and-rollbacks).
+3. Keep the current token file and OAuth client configuration; do not delete
+   credentials or restore an older token backup. With all other instances still
+   stopped, run `withings-mcp-server auth` once using the intended build,
+   environment and token path, and authorize the intended Withings account.
+   This command requires the configured local HTTP callback; for other redirect
+   setups, use `withings_get_auth_url` then `withings_exchange_code` in a single
+   deliberately started instance with the same configuration. Successful
+   reauthorization replaces the store with fresh provider credentials in the
+   intended format; merely changing the environment does not convert the file.
+4. Check `withings-mcp-server doctor --strict` with each client's intended configuration
+   to confirm the token file is readable before restarting clients and restoring
+   automatic restarts. If authorization or validation fails, keep other clients
+   stopped and resolve the error before resuming; do not restore stale tokens
+   after provider credentials may have rotated.
+
+Encryption does not protect existing plaintext copies or backups. Keep those
+protected separately; a deliberate plaintext rollback also removes encryption
+at rest from subsequent token writes.
