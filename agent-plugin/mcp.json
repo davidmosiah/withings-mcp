@@ -6,7 +6,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "withings-mcp-unofficial@0.5.5"
+        "withings-mcp-unofficial@0.6.0"
       ],
       "cwd": "${PLUGIN_DATA}"
     }

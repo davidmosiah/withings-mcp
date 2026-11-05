@@ -357,10 +357,16 @@ encryption on an existing store, rotate the key, recover from a lost key, or
 deliberately return to plaintext, use this coordinated transition:
 
 The bundled Agent Plugin (`agent-plugin/mcp.json`) currently pins
-`withings-mcp-unofficial@0.5.5`, which lacks encryption support and uses the older
-`.lock` implementation. Do not run that pinned executable against a token file
-shared with this build; keep it stopped until its executable has been explicitly
-verified as compatible with the intended encryption mode and lock implementation.
+`withings-mcp-unofficial@0.6.0`. That published package uses the same `.lock.sqlite`
+lock but has no token-encryption support: it cannot use an encrypted store, and
+explicit reauthorization can replace it with plaintext under the same lock.
+Passing an encryption key to that executable does not add encryption support.
+The plugin's `${PLUGIN_DATA}` working directory does not isolate the default
+home-directory token path. Keep the pinned executable stopped during an encrypted
+store transition and do not resume it against that store; first configure and
+verify an encryption-capable executable for every client that shares the store.
+Older `0.5.5` clients also use the incompatible `.lock` implementation and require
+the coordinated token-lock migration below.
 
 1. Stop **all** processes sharing the token file, including MCP clients, HTTP
    helpers and scheduled jobs. Pause automatic restarts; do not run competing
@@ -379,10 +385,13 @@ verified as compatible with the intended encryption mode and lock implementation
    deliberately started instance with the same configuration. Successful
    reauthorization replaces the store with fresh provider credentials in the
    intended format; merely changing the environment does not convert the file.
-4. Check `withings-mcp-server doctor --strict` with each client's intended configuration
-   to confirm the token file is readable before restarting clients and restoring
-   automatic restarts. If authorization or validation fails, keep other clients
-   stopped and resolve the error before resuming; do not restore stale tokens
+4. After verifying executable support for the intended format, run that executable's
+   `doctor --strict` with each client's intended configuration to confirm the token
+   file is readable before restarting clients and restoring automatic restarts.
+   The published `0.6.0` doctor can mistake an encrypted JSON envelope for readable
+   tokens; its success is not proof of encryption support. If authorization or
+   validation fails, keep other clients stopped and resolve the error before
+   resuming; do not restore stale tokens
    after provider credentials may have rotated.
 
 Encryption does not protect existing plaintext copies or backups. Keep those
