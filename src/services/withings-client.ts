@@ -142,7 +142,7 @@ export class WithingsClient {
       body: new URLSearchParams(stringifyParams(cleanBody)).toString()
     });
 
-    if (response.status === 401) {
+    if (await isRejectedToken(response)) {
       const refreshed = await this.refreshToken(true, token);
       const retry = await this.fetchWithRetry(url, {
         method: "POST",
@@ -187,8 +187,9 @@ export class WithingsClient {
       if (normalizeUserId(refreshed.userid) !== originalUser) {
         throw new Error("Withings refresh account identity changed or is unavailable. Re-authorize before retrying.");
       }
-      await this.tokenStore.write({ ...current, ...refreshed });
-      return { ...current, ...refreshed };
+      const next = { ...current, ...refreshed, scope: refreshed.scope ?? current.scope };
+      await this.tokenStore.write(next);
+      return next;
     });
   }
 
@@ -205,10 +206,15 @@ export class WithingsClient {
       method: "POST",
       headers: this.publicFormHeaders(),
       body: new URLSearchParams(stringifyParams(signed)).toString()
-    });
+    }, true);
     const data = await this.parseResponse(response) as Record<string, unknown>;
     const tokenBody = isObject(data.body) ? data.body : data;
     const expiresIn = typeof tokenBody.expires_in === "number" ? tokenBody.expires_in : undefined;
+    if (typeof tokenBody.access_token !== "string" || !tokenBody.access_token ||
+        typeof tokenBody.refresh_token !== "string" || !tokenBody.refresh_token ||
+        !expiresIn || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new Error("Withings token response was incomplete; saved credentials were preserved.");
+    }
     return {
       userid: normalizeUserId(tokenBody.userid),
       access_token: String(tokenBody.access_token ?? ""),
@@ -277,8 +283,10 @@ export class WithingsClient {
     return payload ?? {};
   }
 
-  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
-    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {});
+  private async fetchWithRetry(url: string, init: RequestInit, noRetry = false): Promise<Response> {
+    // A signed token request contains a single-use nonce and authorization code
+    // or rotating refresh credential. Never blindly replay that same payload.
+    const retryWrappedFetch = (u: string, i?: RequestInit) => fetchWithRetry(u, i ?? {}, noRetry ? { noRetry: true } : {});
     return fetchWithCache(url, init, {
       defaultTtlSeconds: 60,
       envVarBypass: "WITHINGS_NO_CACHE",
@@ -396,6 +404,17 @@ function cleanParams(input: WithingsActionParams): Record<string, string | numbe
 
 function stringifyParams(input: Record<string, string | number | boolean | undefined>): Record<string, string> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)]));
+}
+
+// Withings reports an invalid or expired access token as HTTP 401 or JSON
+// status 100, 101, 102, 200 or 401. Other statuses are not token failures.
+const REJECTED_TOKEN_STATUSES = new Set([100, 101, 102, 200, 401]);
+
+async function isRejectedToken(response: Response): Promise<boolean> {
+  if (response.status === 401) return true;
+  if (!response.ok) return false;
+  const payload = await response.clone().json().catch(() => null);
+  return isObject(payload) && typeof payload.status === "number" && REJECTED_TOKEN_STATUSES.has(payload.status);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

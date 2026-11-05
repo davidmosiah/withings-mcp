@@ -316,3 +316,20 @@ vascular age) and unknown types retain their numeric data without a guessed
 unit; raw JSON remains unchanged. Markdown previews display decoded scale values
 and units instead of the generic activity fields. Measurement type units follow
 the [official API reference](https://developer.withings.com/api-reference/#operation/measure-getmeas).
+
+### Token rotation and API failures
+
+Before upgrading or rolling back across the token-lock change, stop **all**
+instances that share the token file. The older `.lock` and newer `.lock.sqlite`
+implementations do not coordinate with each other; never run them together.
+Follow the [coordinated upgrade and rollback procedure](docs/migration-0.6.0.md#token-lock-upgrades-and-rollbacks).
+
+Token records retain the Withings `userid`. Refreshes serialize across processes
+using an OS-held SQLite lock (the existing SQLite dependency), which releases
+automatically after a process crash. New credentials are flushed and atomically
+replaced before use. HTTP 401 and the JSON invalid-token statuses 100, 101, 102,
+200 and 401 trigger one refresh; concurrent rejected requests reuse a rotation that
+already completed. Incomplete token responses or a changed user identity leave
+saved credentials intact. Signed token requests are never replayed automatically.
+
+Authenticated API failures remain errors, including transient failures; no earlier response is substituted.
