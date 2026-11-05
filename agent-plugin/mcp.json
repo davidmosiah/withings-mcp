@@ -1,0 +1,14 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "withings": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "withings-mcp-unofficial@0.5.5"
+      ],
+      "cwd": "${PLUGIN_DATA}"
+    }
+  }
+}
