@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { parseLocalRedirectUri } from '../dist/cli/auth.js';
+import { browserOpenCommand, parseLocalRedirectUri } from '../dist/cli/auth.js';
 import { buildConnectionStatus } from '../dist/services/connection-status.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'withings-mcp-cli-'));
@@ -50,6 +50,13 @@ try {
     path: '/callback'
   });
   assert.throws(() => parseLocalRedirectUri('https://example.com/callback'), /local redirect URI/i);
+
+  const authUrl = 'https://account.withings.com/oauth2_user/authorize2?response_type=code&client_id=abc&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fcallback&scope=user.metrics&state=1234';
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    const { command, args } = browserOpenCommand(authUrl, platform);
+    assert.notEqual(command, 'cmd', `${platform} must not open the auth URL through cmd.exe, which splits it at &`);
+    assert.equal(args.at(-1), authUrl, `${platform} must pass the full auth URL as one argument`);
+  }
 
   const doctor = spawnSync(process.execPath, ['dist/index.js', 'doctor', '--json'], {
     encoding: 'utf8',
