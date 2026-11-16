@@ -131,9 +131,16 @@ function waitForOAuthCode(
   });
 }
 
+export function browserOpenCommand(url: string, platform: NodeJS.Platform = process.platform): { command: string; args: string[] } {
+  if (platform === "darwin") return { command: "open", args: [url] };
+  // `cmd /c start` would treat every `&` in the query string as a command
+  // separator and open a truncated URL; rundll32 hands the URL over untouched.
+  if (platform === "win32") return { command: "rundll32", args: ["url.dll,FileProtocolHandler", url] };
+  return { command: "xdg-open", args: [url] };
+}
+
 function openBrowser(url: string): void {
-  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  const { command, args } = browserOpenCommand(url);
   const child = spawn(command, args, { detached: true, stdio: "ignore" });
   child.unref();
 }
