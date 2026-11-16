@@ -83,7 +83,7 @@ for (const [identity,expected] of [[42,'42'],['42','42'],[undefined,undefined],[
  client.fetchWithRetry=async()=>{
   calls++;
   current=token('2','synthetic-b');
-  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:true}});
+  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:true,offset:1}});
  };
  await assert.rejects(client.list('/measure',{all_pages:true,max_pages:2,limit:1}),/identity changed during pagination/);
  assert.equal(calls,1,'must not request a second page as B or return partial mixed results');
@@ -93,7 +93,7 @@ for (const [identity,expected] of [[42,'42'],['42','42'],[undefined,undefined],[
  let calls=0;
  client.fetchWithRetry=async()=>{
   calls++;
-  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:calls===1}});
+  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:calls===1,offset:1}});
  };
  assert.equal((await client.list('/measure',{all_pages:true,max_pages:2,limit:1})).records.length,2);
  assert.equal(calls,2);
@@ -121,7 +121,7 @@ for (const [identity,expected] of [[42,'42'],['42','42'],[undefined,undefined],[
  client.tokenStore.read=async()=>current;
  client.fetchWithRetry=async()=>{
   calls++; current=token(undefined);
-  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:true}});
+  return Response.json({status:0,body:{measuregrps:[{synthetic:'A'}],more:true,offset:1}});
  };
  await assert.rejects(client.list('/measure',{all_pages:true,max_pages:2,limit:1}),/identity changed during pagination/);
  assert.equal(calls,1);

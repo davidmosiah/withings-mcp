@@ -91,7 +91,9 @@ try {
   }
 
   assert.equal(result.records.length, 10, 'local output cap must protect MCP clients even if upstream ignores limit');
-  assert.equal(result.next_page, 2, 'local truncation should advertise a follow-up page');
+  assert.equal(result.next_page, undefined, 'a split vendor page must not invent an offset');
+  assert.equal(result.next_offset, undefined);
+  assert.ok(result.next_cursor, 'local truncation must advertise exact continuation');
   assert.equal(result.pages_fetched, 1);
 
   // Plain YYYY-MM-DD expands to start/end of UTC day for epoch endpoints.
