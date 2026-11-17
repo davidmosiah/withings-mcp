@@ -1,3 +1,11 @@
+## Unreleased
+
+### Fixed
+
+- Honor summary timezones for civil dates and DST-aware body/heart day bounds; reject invalid timezones before requesting data.
+- Keep today's daily scorecard separate from the requested recent-activity lookback. Expose observed-day activity coverage and date provenance in daily summaries and wellness context.
+- Report empty/partial summaries truthfully, preserve observed zero values, and avoid inferring readiness or sleep deficits from missing records.
+
 ## 0.6.0 - 2026-11-05
 
 ### Security

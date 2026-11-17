@@ -68,14 +68,14 @@ export const ExchangeCodeInputSchema = z.object({
 }).strict();
 
 export const DailySummaryInputSchema = z.object({
-  days: z.number().int().min(1).max(30).default(7).describe("Lookback window for recent training context."),
-  timezone: z.string().min(1).max(80).default("UTC").describe("IANA timezone used only for display, e.g. America/New_York."),
+  days: z.number().int().min(1).max(30).default(7).describe("Civil-day lookback for recent_activity training context, including today; today's scorecard is never replaced by older records."),
+  timezone: z.string().min(1).max(80).default("UTC").describe("IANA timezone defining civil dates and day boundaries, e.g. America/Toronto."),
   response_format: ResponseFormatSchema
 }).strict();
 
 export const WellnessContextInputSchema = z.object({
-  days: z.number().int().min(1).max(30).default(7).describe("Lookback window for normalized Withings wellness context."),
-  timezone: z.string().min(1).max(80).default("UTC").describe("IANA timezone used only for display, e.g. America/New_York."),
+  days: z.number().int().min(1).max(30).default(7).describe("Civil-day lookback for recent activity load; sleep score remains today's observed score."),
+  timezone: z.string().min(1).max(80).default("UTC").describe("IANA timezone defining civil dates and day boundaries, e.g. America/Toronto."),
   soreness: z.array(z.string().min(1).max(80)).default([]),
   injury_flags: z.array(z.string().min(1).max(120)).default([]),
   notes: z.string().max(500).optional(),
@@ -85,7 +85,7 @@ export const WellnessContextInputSchema = z.object({
 export const WeeklySummaryInputSchema = z.object({
   days: z.number().int().min(7).max(60).default(7).describe("Recent analysis window in days."),
   compare_days: z.number().int().min(0).max(60).default(7).describe("Prior comparison window in days. Use 0 to disable comparison."),
-  timezone: z.string().min(1).max(80).default("UTC").describe("IANA timezone used only for display, e.g. America/New_York."),
+  timezone: z.string().min(1).max(80).default("UTC").describe("IANA timezone defining civil dates and day boundaries, e.g. America/Toronto."),
   response_format: ResponseFormatSchema
 }).strict();
 

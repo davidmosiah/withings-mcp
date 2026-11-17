@@ -141,6 +141,14 @@ This package uses the official Withings Public API. When this README says `raw`,
 - `withings_daily_summary` — body, sleep, activity and heart brief for today
 - `withings_weekly_summary` — scorecard, comparison vs prior week, next-week plan
 
+### Summary dates and missing data
+
+- `timezone` defines today's civil date and the epoch bounds sent for body/heart records. It defaults to `UTC`; pass an IANA zone such as `America/Toronto` for your local day. Invalid zones fail before API requests. Day lengths follow daylight-saving transitions rather than assuming 24 hours.
+- Daily `scorecard` always describes today in that zone. `days` (1–30, default 7) controls the separate `recent_activity` lookback, including today. Older records never replace today's missing values. Lookback steps are deduplicated by date (last record per date), and `avg_steps` averages observed days only; `days_with_activity` exposes the denominator. A multi-day lookback adds one activity range request; `days=1` reuses today's response.
+- `withings_wellness_context` uses that observed-day average for `recent_training_load`, retains today's sleep score, and includes `window` and `recent_activity` so consumers can see the dates and coverage.
+- Weekly current and comparison windows are consecutive civil days, including today in the current window. Explicit start/end dates accompany each window. Averages ignore missing measurements; an entirely missing step series has no `total_steps`, not zero.
+- Daily `data_quality.domains` distinguishes recognized summary metrics (`available`), empty or unrecognized metrics (`no_data`), and failed requests (`error`). `missing_or_failed` is true for either missing or failed domains. Confidence is `low` when none are available and `partial` when some are missing or failed; observed zero values remain valid data. Weekly coverage counts and failed-request counts describe its current window. Missing sleep produces `unknown` readiness/load, never an invented sleep deficit or reassuring neutral assessment.
+
 **Auth & diagnostics**
 
 - `withings_capabilities`, `withings_agent_manifest`, `withings_privacy_audit`, `withings_cache_status`

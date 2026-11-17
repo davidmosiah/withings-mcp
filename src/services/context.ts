@@ -23,12 +23,14 @@ export async function buildWellnessContext(client: Pick<WithingsClient, "get">, 
   const summary = await buildDailySummary(client as WithingsClient, options);
   const scorecard = record(summary.scorecard);
   const sleepScore = num(scorecard.sleep_score);
-  const steps = num(scorecard.steps);
+  const steps = num(summary.recent_activity.avg_steps);
   const recentTrainingLoad = loadFromSteps(steps);
 
   return {
     source: "withings",
     generated_at: summary.generated_at,
+    window: summary.window,
+    recent_activity: summary.recent_activity,
     sleep_score: sleepScore,
     recent_training_load: recentTrainingLoad,
     soreness: options.soreness ?? [],

@@ -48,6 +48,7 @@ function demoDailySummary(generatedAt: string) {
     },
     data_quality: {
       confidence: "high",
+      domains: { activity: "available", sleep: "available", measures: "available", heart: "available" },
       missing_or_failed: {
         activity: false,
         sleep: false,
@@ -57,6 +58,10 @@ function demoDailySummary(generatedAt: string) {
     },
     scorecard: {
       date,
+      has_activity_data: true,
+      has_sleep_data: true,
+      has_measures_data: true,
+      has_heart_data: true,
       steps: 8421,
       calories: 489,
       distance_m: 6870,
@@ -73,6 +78,16 @@ function demoDailySummary(generatedAt: string) {
       has_sleep_error: false,
       has_measures_error: false,
       has_heart_error: false
+    },
+    recent_activity: {
+      start_date: date,
+      end_date: date,
+      days: 1,
+      days_with_activity: 1,
+      average_basis: "observed_days_only",
+      total_steps: 8421,
+      avg_steps: 8421,
+      status: "available"
     },
     diagnostic: {
       readiness_context: "neutral",
@@ -96,23 +111,18 @@ function demoDailySummary(generatedAt: string) {
  * structured signals to another agent and lets that agent do the advising.
  */
 function demoWellnessContext(generatedAt: string) {
+  const daily = demoDailySummary(generatedAt);
   return {
     source: "withings",
     generated_at: generatedAt,
+    window: daily.window,
+    recent_activity: daily.recent_activity,
     sleep_score: 78,
     recent_training_load: "normal",
     soreness: [],
     injury_flags: [],
     notes: [],
-    data_quality: {
-      confidence: "high",
-      missing_or_failed: {
-        activity: false,
-        sleep: false,
-        measures: false,
-        heart: false
-      }
-    },
+    data_quality: daily.data_quality,
     telegram_summary: "Withings wellness context | Sleep: 78 | Load: normal"
   };
 }
